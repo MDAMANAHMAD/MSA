@@ -200,6 +200,41 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     }
   };
 
+  // Get a clean, human-friendly, short title for the document
+  const getDocumentDisplayTitle = (doc) => {
+    if (category === 'salary_slip' || category === 'mileage') {
+      try {
+        const d = new Date(doc.date);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); // e.g. "February 2026"
+        }
+      } catch (e) {}
+    } else if (category === 'ot') {
+      try {
+        const endDate = new Date(doc.date);
+        if (!isNaN(endDate.getTime())) {
+          const startDate = new Date(endDate);
+          startDate.setDate(endDate.getDate() - 13);
+          
+          const formatShort = (d) => {
+            const day = String(d.getDate()).padStart(2, '0');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${day} ${months[d.getMonth()]}`;
+          };
+          
+          const formatLong = (d) => {
+            const day = String(d.getDate()).padStart(2, '0');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+          };
+          
+          return `${formatShort(startDate)} to ${formatLong(endDate)}`; // e.g. "17 May to 30 May 2026"
+        }
+      } catch (e) {}
+    }
+    return doc.file_name;
+  };
+
   const getCategoryTitle = () => {
     if (category === 'salary_slip') return 'Salary Slips';
     if (category === 'ot') return 'Overtime (OT)';
@@ -310,7 +345,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
                       <FileText size={22} />
                     </div>
                     <div className="document-meta">
-                      <h4>{doc.file_name}</h4>
+                      <h4>{getDocumentDisplayTitle(doc)}</h4>
                       <p>{new Date(doc.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                       
                       <div className="badge-row">
