@@ -240,15 +240,22 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
           const startDate = new Date(endDate);
           startDate.setDate(endDate.getDate() - 14);
           
-          const formatYMD = (d) => {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
+          const monthsShort = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+          ];
+          
+          const formatReadable = (d) => {
             const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            const month = monthsShort[d.getMonth()];
+            return `${day}_${month}`;
           };
           
-          const startDateStr = formatYMD(startDate);
-          friendlyName = `${startDateStr}_to_${date}_OT_${hours || 0}hrs.pdf`;
+          const startStr = formatReadable(startDate);
+          const endStr = formatReadable(endDate);
+          const year = endDate.getFullYear();
+          
+          friendlyName = `${startStr}_to_${endStr}_${year}_OT_${hours || 0}hrs.pdf`;
         }
       } catch (dateErr) {
         console.error('Failed to calculate 15-day range, using fallback:', dateErr.message);
