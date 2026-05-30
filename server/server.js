@@ -55,6 +55,47 @@ const upload = multer({
 
 // --- GOOGLE DRIVE AUTH ENDPOINTS ---
 
+// --- AUTOMATIC BACKGROUND SYNC SWEEP SYSTEM ---
+async function syncAllUnsyncedDocuments() {
+  console.log('Starting automatic background sync sweep for unsynced documents...');
+  try {
+    const isDriveAuthorized = await googleDriveService.isAuthorized();
+    if (!isDriveAuthorized) {
+      console.log('Automatic sync sweep skipped: Google Drive is not connected.');
+      return;
+    }
+
+    // Retrieve all documents that are currently local-only
+    const unsyncedDocs = await dbAll("SELECT * FROM documents WHERE google_drive_id IS NULL OR google_drive_id = ''");
+    if (unsyncedDocs.length === 0) {
+      console.log('Automatic sync sweep completed: No unsynced documents found.');
+      return;
+    }
+
+    console.log(`Found ${unsyncedDocs.length} unsynced documents. Commencing background cloud sync...`);
+    
+    // Sync sequentially in the background to avoid rate limits or CPU spikes on Render
+    for (const doc of unsyncedDocs) {
+      try {
+        if (fs.existsSync(doc.file_path)) {
+          console.log(`Auto-syncing Doc #${doc.id} ("${doc.file_name}") to Google Drive...`);
+          const uploadResult = await googleDriveService.uploadToDrive(doc.file_path, doc.file_name, doc.category);
+          
+          await dbRun('UPDATE documents SET google_drive_id = ? WHERE id = ?', [uploadResult.id, doc.id]);
+          console.log(`Doc #${doc.id} auto-synced successfully to Drive!`);
+        } else {
+          console.warn(`Local source file for Doc #${doc.id} is missing. Skipping auto-sync.`);
+        }
+      } catch (docErr) {
+        console.error(`Failed to auto-sync Doc #${doc.id}:`, docErr.message);
+      }
+    }
+    console.log('Background automatic sync sweep completed.');
+  } catch (err) {
+    console.error('Error during automatic background sync sweep:', err.message);
+  }
+}
+
 // Check if Google Drive is authorized
 app.get('/api/auth/status', async (req, res) => {
   try {
@@ -62,6 +103,8 @@ app.get('/api/auth/status', async (req, res) => {
     let email = null;
     if (authorized) {
       email = await googleDriveService.getConnectedUserEmail();
+      // Safely kick off background sweep asynchronously so the status page loads instantly
+      syncAllUnsyncedDocuments().catch(err => console.error('Auto-sync status sweep error:', err.message));
     }
     res.json({ authorized, email });
   } catch (error) {
@@ -88,6 +131,9 @@ app.get('/api/auth/callback', async (req, res) => {
 
   try {
     await googleDriveService.saveTokensFromCode(code);
+    
+    // Safely trigger background sweep immediately after successful connection
+    syncAllUnsyncedDocuments().catch(err => console.error('Callback auto-sync error:', err.message));
     
     // Serve a beautiful success page to your dad on his phone browser
     res.send(`
@@ -479,4 +525,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+  // Safely trigger background sweep on startup to auto-sync any pending files
+  syncAllUnsyncedDocuments().catch(err => console.error('Startup auto-sync sweep error:', err.message));
 });
