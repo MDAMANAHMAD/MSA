@@ -211,13 +211,26 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
   }
 
   try {
-    // Create friendly file name for local and drive storage: YYYY-MM-DD_Category.pdf
-    const formattedDate = date.replace(/-/g, '_');
-    let friendlyName = `${date}_${category}.pdf`;
+    // Helper to get Month_Year string (e.g. May_2026)
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June", 
+      "July", "August", "September", "October", "November", "December"
+    ];
+    let monthYearStr = formattedDate;
+    try {
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        monthYearStr = `${monthNames[d.getMonth()]}_${d.getFullYear()}`;
+      }
+    } catch (e) {
+      console.error('Date parsing failed:', e);
+    }
     
-    if (category === 'salary_slip' && amount) {
-      friendlyName = `${date}_Salary_Slip_${amount}.pdf`;
-    } else if (category === 'ot' || category === 'mileage') {
+    if (category === 'salary_slip') {
+      friendlyName = `${monthYearStr}_Salary_Slip_${amount || 0}.pdf`;
+    } else if (category === 'mileage') {
+      friendlyName = `${monthYearStr}_Mileage_${miles || 0}miles.pdf`;
+    } else if (category === 'ot') {
       try {
         const endDate = new Date(date);
         if (!isNaN(endDate.getTime())) {
@@ -232,17 +245,11 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
           };
           
           const startDateStr = formatYMD(startDate);
-          
-          if (category === 'ot') {
-            friendlyName = `${startDateStr}_to_${date}_OT_${hours || 0}hrs.pdf`;
-          } else {
-            friendlyName = `${startDateStr}_to_${date}_Mileage_${miles || 0}miles.pdf`;
-          }
+          friendlyName = `${startDateStr}_to_${date}_OT_${hours || 0}hrs.pdf`;
         }
       } catch (dateErr) {
         console.error('Failed to calculate 15-day range, using fallback:', dateErr.message);
-        if (category === 'ot') friendlyName = `${date}_OT_${hours || 0}hrs.pdf`;
-        if (category === 'mileage') friendlyName = `${date}_Mileage_${miles || 0}miles.pdf`;
+        friendlyName = `${date}_OT_${hours || 0}hrs.pdf`;
       }
     }
 
