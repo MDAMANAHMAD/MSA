@@ -13,7 +13,7 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
   const [rangePreview, setRangePreview] = useState('');
 
   useEffect(() => {
-    if (category === 'ot' || category === 'mileage') {
+    if (category === 'ot') {
       try {
         const endDate = new Date(date);
         if (!isNaN(endDate.getTime())) {

@@ -50,8 +50,8 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
 
   // --- LONG-PRESS TRIGGER LOGIC ---
   const handleStartPress = (doc) => {
-    // Only OT and Mileage support the Orange/Green received status toggle
-    if (category !== 'ot' && category !== 'mileage') return;
+    // Only OT supports the Orange/Green received status toggle
+    if (category !== 'ot') return;
 
     setPressingId(doc.id);
     touchMovedRef.current = false;
@@ -261,7 +261,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
         </div>
 
         {/* Info label for Long Press */}
-        {(category === 'ot' || category === 'mileage') && documents.length > 0 && (
+        {category === 'ot' && documents.length > 0 && (
           <div className="long-press-hint">
             <HelpCircle size={14} /> Hold card down for 1.5s to toggle Orange/Green state.
           </div>
@@ -287,7 +287,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
           <div className="document-list">
             {documents.map((doc) => {
               const isPressing = pressingId === doc.id;
-              const isOtOrMileage = category === 'ot' || category === 'mileage';
+              const isOt = category === 'ot';
               
               // Determine visual class based on receipt status
               const statusClass = doc.is_received === 1 ? 'received' : 'pending';
@@ -295,7 +295,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
               return (
                 <div
                   key={doc.id}
-                  className={`document-card ${isOtOrMileage ? statusClass : ''} ${isPressing ? 'pressing' : ''}`}
+                  className={`document-card ${isOt ? statusClass : ''} ${isPressing ? 'pressing' : ''}`}
                   onClick={() => handleOpenPdf(doc)}
                   onMouseDown={() => handleStartPress(doc)}
                   onMouseUp={handleCancelPress}
@@ -314,7 +314,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
                       <p>{new Date(doc.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                       
                       <div className="badge-row">
-                        {isOtOrMileage && (
+                        {isOt && (
                           <span className={`badge ${doc.is_received === 1 ? 'received' : 'pending'}`}>
                             {doc.is_received === 1 ? 'Received' : 'Pending'}
                           </span>
