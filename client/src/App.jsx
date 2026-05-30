@@ -13,16 +13,15 @@ export default function App() {
 
   // Settings base API Url state
   const [apiUrl, setApiUrl] = useState(() => {
-    // If running in development, default to local server port 5000
-    // Otherwise fallback to same origin or local port
     const saved = localStorage.getItem('msa_api_url');
     if (saved) return saved;
     
-    // Auto-detect environments
-    if (window.location.port === '5173' || window.location.port === '3000') {
+    // If running locally in development, default to local server port 5000
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:5000';
     }
-    return window.location.origin;
+    // Permanent production fallback to your live Render backend
+    return 'https://msa-ozae.onrender.com';
   });
 
   // Visual Toast notifications
