@@ -211,6 +211,9 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
   }
 
   try {
+    const formattedDate = date.replace(/-/g, '_');
+    let friendlyName = `${date}_${category}.pdf`;
+
     // Helper to get Month_Year string (e.g. May_2026)
     const monthNames = [
       "January", "February", "March", "April", "May", "June", 
