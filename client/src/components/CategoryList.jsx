@@ -168,7 +168,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     { value: '12', name: 'December' },
   ];
 
-  const yearsList = ['2024', '2025', '2026', '2027', '2028'];
+  const yearsList = Array.from({ length: 41 }, (_, i) => String(2000 + i));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '80px' }}>
