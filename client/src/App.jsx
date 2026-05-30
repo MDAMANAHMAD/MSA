@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import CategoryList from './components/CategoryList';
 import AddDocument from './components/AddDocument';
+import SettingsModal from './components/SettingsModal';
 
 import { Info } from 'lucide-react';
 
@@ -9,6 +10,7 @@ export default function App() {
   // Navigation states: 'dashboard', 'list', 'add'
   const [currentView, setCurrentView] = useState('dashboard');
   const [selectedCategory, setSelectedCategory] = useState('salary_slip');
+  const [showSettings, setShowSettings] = useState(false);
 
 
   // Settings base API Url state
@@ -60,6 +62,7 @@ export default function App() {
         <Dashboard
           apiUrl={apiUrl}
           onCategoryClick={handleCategorySelect}
+          onSettingsClick={() => setShowSettings(true)}
         />
       )}
 
@@ -83,6 +86,13 @@ export default function App() {
       )}
 
 
+
+      {showSettings && (
+        <SettingsModal
+          apiUrl={apiUrl}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
 
       {/* Floating Status Toast HUD */}
       {toastVisible && (

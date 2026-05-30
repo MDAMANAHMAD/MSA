@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Settings, Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight } from 'lucide-react';
 
 export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) {
   const [driveAuthorized, setDriveAuthorized] = useState(false);
@@ -8,13 +8,13 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
   const [greeting, setGreeting] = useState('Welcome Back');
 
   useEffect(() => {
-    // Dynamic secular creative greetings based on hour
+    // Dynamic secular respected greetings based on hour
     const hour = new Date().getHours();
-    if (hour < 4) setGreeting('🌙 Hello! Wrapping up the day\'s records');
-    else if (hour < 12) setGreeting('☀️ Rise & Shine! Have a wonderful morning');
-    else if (hour < 17) setGreeting('🌤️ Good Afternoon! Hope your day is going great');
-    else if (hour < 21) setGreeting('🌆 Good Evening! Unwinding for the day');
-    else setGreeting('🌙 Hello! Wrapping up the day\'s records');
+    if (hour < 4) setGreeting('🌙 Good Night');
+    else if (hour < 12) setGreeting('☀️ Good Morning');
+    else if (hour < 17) setGreeting('🌤️ Good Afternoon');
+    else if (hour < 21) setGreeting('🌆 Good Evening');
+    else setGreeting('🌙 Good Night');
   }, []);
 
   const checkDriveStatus = async () => {
@@ -57,8 +57,16 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
       <div className="app-header">
         <div className="header-top">
           <div className="header-greeting">{greeting}</div>
+          <button className="btn-icon" onClick={onSettingsClick} title="Open Settings">
+            <Settings size={22} />
+          </button>
         </div>
-        <div className="header-sub">Md Shakil Ahmad - Document Hub</div>
+        <div className="header-sub">
+          <span className="shining-name" style={{ fontSize: '1.05rem', textShadow: '0 2px 10px rgba(241,196,15,0.2)' }}>
+            Md Shakil Ahmad
+          </span>
+          {' '}- Document Hub
+        </div>
         <div className="header-date">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </div>
@@ -69,37 +77,19 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
         {/* Google Drive Auth Status Banner */}
         {!loadingDrive && (
           driveAuthorized ? (
-            <div className="status-card success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div className="status-card-icon">
-                  <Cloud size={20} style={{ color: 'var(--accent-salary)' }} />
-                </div>
-                <div className="status-card-text">
-                  <h4>Google Drive Active</h4>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 'bold', wordBreak: 'break-all' }}>
-                    {driveEmail || 'Connected to cloud storage'}
-                  </p>
-                </div>
+            <div className="status-card success" onClick={onSettingsClick}>
+              <div className="status-card-icon">
+                <Cloud size={20} style={{ color: 'var(--accent-salary)' }} />
               </div>
-              <button 
-                onClick={handleLinkDrive} 
-                style={{ 
-                  background: 'rgba(46, 204, 113, 0.15)', 
-                  border: 'none', 
-                  borderRadius: '100px', 
-                  color: '#27AE60', 
-                  padding: '6px 12px', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 'bold', 
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Switch Account
-              </button>
+              <div className="status-card-text">
+                <h4>Google Drive Active</h4>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 'bold', wordBreak: 'break-all' }}>
+                  {driveEmail || 'Connected to cloud storage'}
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="status-card pending" onClick={handleLinkDrive}>
+            <div className="status-card pending" onClick={onSettingsClick}>
               <div className="status-card-icon">
                 <AlertTriangle size={20} style={{ color: 'var(--accent-ot)' }} />
               </div>
@@ -171,7 +161,10 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
           marginTop: '30px',
           opacity: 0.8
         }}>
-          Designed & Developed with ♥ by Md Aman Ahmad
+          Designed & Developed with ♥ by{' '}
+          <span className="shining-name" style={{ fontSize: '0.8rem' }}>
+            Md Aman Ahmad
+          </span>
         </div>
 
       </div>

@@ -754,3 +754,21 @@ body {
 .empty-state p {
   font-weight: 500;
 }
+
+/* Premium Gold Shimmer Shining Name Effect */
+.shining-name {
+  background: linear-gradient(120deg, #F39C12, #F1C40F, #E67E22, #F1C40F, #F39C12);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 6px rgba(243, 156, 18, 0.45));
+  animation: shine 3.5s linear infinite;
+  font-weight: 700;
+  display: inline-block;
+}
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
