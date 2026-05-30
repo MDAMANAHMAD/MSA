@@ -59,7 +59,11 @@ const upload = multer({
 app.get('/api/auth/status', async (req, res) => {
   try {
     const authorized = await googleDriveService.isAuthorized();
-    res.json({ authorized });
+    let email = null;
+    if (authorized) {
+      email = await googleDriveService.getConnectedUserEmail();
+    }
+    res.json({ authorized, email });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -238,7 +242,7 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
         const endDate = new Date(date);
         if (!isNaN(endDate.getTime())) {
           const startDate = new Date(endDate);
-          startDate.setDate(endDate.getDate() - 14);
+          startDate.setDate(endDate.getDate() - 13);
           
           const monthsShort = [
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", 

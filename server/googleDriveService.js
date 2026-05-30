@@ -159,9 +159,25 @@ async function uploadToDrive(localFilePath, fileName, category) {
   };
 }
 
+// Get connected user email address
+async function getConnectedUserEmail() {
+  try {
+    const auth = await getAuthenticatedClient();
+    const drive = google.drive({ version: 'v3', auth });
+    const response = await drive.about.get({
+      fields: 'user(emailAddress)'
+    });
+    return response.data.user?.emailAddress || null;
+  } catch (err) {
+    console.error('Error fetching user email:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   isAuthorized,
   getAuthUrl,
   saveTokensFromCode,
-  uploadToDrive
+  uploadToDrive,
+  getConnectedUserEmail
 };

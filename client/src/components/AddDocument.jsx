@@ -18,14 +18,14 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
         const endDate = new Date(date);
         if (!isNaN(endDate.getTime())) {
           const startDate = new Date(endDate);
-          startDate.setDate(endDate.getDate() - 14);
+          startDate.setDate(endDate.getDate() - 13);
 
           const formatDateReadable = (d) => {
             const options = { day: '2-digit', month: 'short', year: 'numeric' };
             return d.toLocaleDateString('en-GB', options);
           };
 
-          setRangePreview(`Automatically calculated cycle period:\n${formatDateReadable(startDate)} to ${formatDateReadable(endDate)} (15 Days)`);
+          setRangePreview(`Automatically calculated cycle period:\n${formatDateReadable(startDate)} to ${formatDateReadable(endDate)} (14 Days)`);
         }
       } catch (err) {
         setRangePreview('');

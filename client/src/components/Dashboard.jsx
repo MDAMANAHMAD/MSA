@@ -3,16 +3,18 @@ import { Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRig
 
 export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) {
   const [driveAuthorized, setDriveAuthorized] = useState(false);
+  const [driveEmail, setDriveEmail] = useState('');
   const [loadingDrive, setLoadingDrive] = useState(true);
-  const [greeting, setGreeting] = useState('Assalamu Alaikum');
+  const [greeting, setGreeting] = useState('Welcome Back');
 
   useEffect(() => {
-    // Determine dynamic Islamic greeting based on hour
+    // Dynamic secular creative greetings based on hour
     const hour = new Date().getHours();
-    if (hour < 4) setGreeting('Assalamu Alaikum, Mr. Shakil');
-    else if (hour < 12) setGreeting('Assalamu Alaikum, Good Morning');
-    else if (hour < 16) setGreeting('Assalamu Alaikum, Good Afternoon');
-    else setGreeting('Assalamu Alaikum, Good Evening');
+    if (hour < 4) setGreeting('🌙 Hello! Wrapping up the day\'s records');
+    else if (hour < 12) setGreeting('☀️ Rise & Shine! Have a wonderful morning');
+    else if (hour < 17) setGreeting('🌤️ Good Afternoon! Hope your day is going great');
+    else if (hour < 21) setGreeting('🌆 Good Evening! Unwinding for the day');
+    else setGreeting('🌙 Hello! Wrapping up the day\'s records');
   }, []);
 
   const checkDriveStatus = async () => {
@@ -21,9 +23,11 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
       const response = await fetch(`${apiUrl}/api/auth/status`);
       const data = await response.json();
       setDriveAuthorized(data.authorized);
+      setDriveEmail(data.email || '');
     } catch (error) {
       console.error('Error checking Drive status:', error);
       setDriveAuthorized(false);
+      setDriveEmail('');
     } finally {
       setLoadingDrive(false);
     }
@@ -65,14 +69,34 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
         {/* Google Drive Auth Status Banner */}
         {!loadingDrive && (
           driveAuthorized ? (
-            <div className="status-card success" onClick={() => checkDriveStatus()}>
-              <div className="status-card-icon">
-                <Cloud size={20} style={{ color: 'var(--accent-salary)' }} />
+            <div className="status-card success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div className="status-card-icon">
+                  <Cloud size={20} style={{ color: 'var(--accent-salary)' }} />
+                </div>
+                <div className="status-card-text">
+                  <h4>Google Drive Active</h4>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 'bold', wordBreak: 'break-all' }}>
+                    {driveEmail || 'Connected to cloud storage'}
+                  </p>
+                </div>
               </div>
-              <div className="status-card-text">
-                <h4>Google Drive Active</h4>
-                <p>Documents are automatically synced to the cloud!</p>
-              </div>
+              <button 
+                onClick={handleLinkDrive} 
+                style={{ 
+                  background: 'rgba(46, 204, 113, 0.15)', 
+                  border: 'none', 
+                  borderRadius: '100px', 
+                  color: '#27AE60', 
+                  padding: '6px 12px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Switch Account
+              </button>
             </div>
           ) : (
             <div className="status-card pending" onClick={handleLinkDrive}>
@@ -135,7 +159,20 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
           </div>
         </div>
 
-
+        {/* Designed & Developed Credit */}
+        <div style={{ 
+          textAlign: 'center', 
+          fontSize: '0.75rem', 
+          color: 'var(--text-muted)', 
+          padding: '24px 0 12px 0', 
+          fontWeight: '600',
+          letterSpacing: '0.3px',
+          borderTop: '1px solid var(--color-border)',
+          marginTop: '30px',
+          opacity: 0.8
+        }}>
+          Designed & Developed with ♥ by Md Aman Ahmad
+        </div>
 
       </div>
     </div>
