@@ -46,13 +46,31 @@ export default function App() {
 
 
 
+  useEffect(() => {
+    // Initialize standard browser history states to map mobile physical back actions
+    window.history.replaceState({ view: 'dashboard' }, '', '#dashboard');
+
+    const handlePopState = (event) => {
+      if (event.state && event.state.view) {
+        setCurrentView(event.state.view);
+      } else {
+        setCurrentView('dashboard');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
     setCurrentView('list');
+    window.history.pushState({ view: 'list' }, '', '#list');
   };
 
   const handleAddSuccess = (message) => {
     setCurrentView('list');
+    window.history.replaceState({ view: 'list' }, '', '#list');
     showToast(message);
   };
 
@@ -70,8 +88,11 @@ export default function App() {
         <CategoryList
           category={selectedCategory}
           apiUrl={apiUrl}
-          onBack={() => setCurrentView('dashboard')}
-          onAddClick={() => setCurrentView('add')}
+          onBack={() => window.history.back()}
+          onAddClick={() => {
+            setCurrentView('add');
+            window.history.pushState({ view: 'add' }, '', '#add');
+          }}
           showToast={showToast}
         />
       )}
@@ -80,7 +101,7 @@ export default function App() {
         <AddDocument
           category={selectedCategory}
           apiUrl={apiUrl}
-          onBack={() => setCurrentView('list')}
+          onBack={() => window.history.back()}
           onSaveSuccess={handleAddSuccess}
         />
       )}

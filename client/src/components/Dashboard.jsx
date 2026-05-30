@@ -62,7 +62,7 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
           </button>
         </div>
         <div className="header-sub">
-          <span className="shining-name" style={{ fontSize: '1.05rem', textShadow: '0 2px 10px rgba(241,196,15,0.2)' }}>
+          <span className="shining-name-header" style={{ fontSize: '1.05rem' }}>
             Md Shakil Ahmad
           </span>
           {' '}- Document Hub
