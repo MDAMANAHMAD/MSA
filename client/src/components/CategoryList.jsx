@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, FileText, Cloud, CloudOff, RefreshCw, Trash2, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Cloud, CloudOff, RefreshCw, Trash2, HelpCircle, Share2 } from 'lucide-react';
 
 export default function CategoryList({ category, apiUrl, onBack, onAddClick, showToast }) {
   const [documents, setDocuments] = useState([]);
@@ -143,6 +143,60 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     } catch (err) {
       console.error(err);
       showToast(err.message || 'Google Drive Sync failed.');
+    }
+  };
+
+  // Share PDF document utilizing the native Web Share API
+  const handleShareDoc = async (e, doc) => {
+    e.stopPropagation(); // Avoid triggering standard PDF preview viewer
+    const pdfUrl = `${apiUrl}/uploads/${pathBasename(doc.file_path)}`;
+    
+    if (!navigator.share) {
+      // Direct Clipboard link copy fallback for unsupported desktop browsers
+      try {
+        await navigator.clipboard.writeText(pdfUrl);
+        showToast('Link copied to clipboard! (Share not supported on this browser)');
+      } catch (err) {
+        showToast('Web sharing is not supported on this device.');
+      }
+      return;
+    }
+
+    showToast('Preparing document...');
+    try {
+      // Attempt to download the PDF as a Blob to share it as a real physical file object
+      const response = await fetch(pdfUrl);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const file = new File([blob], doc.file_name, { type: 'application/pdf' });
+
+      // Check if standard file sharing is allowed by OS/browser
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: doc.file_name,
+          text: doc.file_name,
+        });
+      } else {
+        // Fallback: share the direct cloud sync URL of the document
+        await navigator.share({
+          title: doc.file_name,
+          text: `MSA Hub Document: ${doc.file_name}`,
+          url: pdfUrl,
+        });
+      }
+    } catch (err) {
+      console.warn('Direct file attachment sharing failed, falling back to link sharing:', err.message);
+      try {
+        // Fallback link sharing
+        await navigator.share({
+          title: doc.file_name,
+          text: `MSA Hub Document: ${doc.file_name}`,
+          url: pdfUrl,
+        });
+      } catch (fallbackErr) {
+        console.error('Sharing failed:', fallbackErr);
+      }
     }
   };
 
@@ -307,6 +361,14 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
                         <RefreshCw size={18} />
                       </button>
                     )}
+                    <button
+                      className="action-btn"
+                      onClick={(e) => handleShareDoc(e, doc)}
+                      title="Share document"
+                      style={{ color: 'var(--accent-mileage)' }}
+                    >
+                      <Share2 size={18} />
+                    </button>
                     <button
                       className="action-btn delete"
                       onClick={(e) => handleDeleteDoc(e, doc)}
