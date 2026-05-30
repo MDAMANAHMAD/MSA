@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight } from 'lucide-react';
 
 export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) {
   const [driveAuthorized, setDriveAuthorized] = useState(false);
@@ -53,9 +53,6 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
       <div className="app-header">
         <div className="header-top">
           <div className="header-greeting">{greeting}</div>
-          <button className="btn-icon" onClick={onSettingsClick} title="Open Settings">
-            <Settings size={22} />
-          </button>
         </div>
         <div className="header-sub">Md Shakil Ahmad - Document Hub</div>
         <div className="header-date">

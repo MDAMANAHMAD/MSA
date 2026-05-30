@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import CategoryList from './components/CategoryList';
 import AddDocument from './components/AddDocument';
-import SettingsModal from './components/SettingsModal';
+
 import { Info } from 'lucide-react';
 
 export default function App() {
   // Navigation states: 'dashboard', 'list', 'add'
   const [currentView, setCurrentView] = useState('dashboard');
   const [selectedCategory, setSelectedCategory] = useState('salary_slip');
-  const [showSettings, setShowSettings] = useState(false);
+
 
   // Settings base API Url state
   const [apiUrl, setApiUrl] = useState(() => {
@@ -42,15 +42,7 @@ export default function App() {
     }
   }, [toastVisible]);
 
-  // Save Settings
-  const handleSaveSettings = (newUrl) => {
-    // Clean trailing slashes
-    const cleanedUrl = newUrl.replace(/\/+$/, '');
-    setApiUrl(cleanedUrl);
-    localStorage.setItem('msa_api_url', cleanedUrl);
-    setShowSettings(false);
-    showToast('✓ Settings saved successfully!');
-  };
+
 
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
@@ -68,7 +60,6 @@ export default function App() {
         <Dashboard
           apiUrl={apiUrl}
           onCategoryClick={handleCategorySelect}
-          onSettingsClick={() => setShowSettings(true)}
         />
       )}
 
@@ -91,14 +82,7 @@ export default function App() {
         />
       )}
 
-      {/* Settings Dialog Overlay */}
-      {showSettings && (
-        <SettingsModal
-          currentUrl={apiUrl}
-          onSave={handleSaveSettings}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+
 
       {/* Floating Status Toast HUD */}
       {toastVisible && (
