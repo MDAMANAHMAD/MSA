@@ -154,14 +154,14 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
           textAlign: 'center', 
           fontSize: '0.75rem', 
           color: 'var(--text-muted)', 
-          padding: '24px 0 12px 0', 
+          padding: '16px 0 12px 0', 
           fontWeight: '600',
           letterSpacing: '0.3px',
           borderTop: '1px solid var(--color-border)',
-          marginTop: '30px',
+          marginTop: '18px',
           opacity: 0.8
         }}>
-          Designed & Developed with ♥ by{' '}
+          Designed & Developed with <span style={{ color: '#E74C3C', fontSize: '0.85rem' }}>♥</span> by{' '}
           <span className="shining-name" style={{ fontSize: '0.8rem' }}>
             Md Aman Ahmad
           </span>
