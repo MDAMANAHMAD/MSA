@@ -145,7 +145,8 @@ app.get('/api/auth/callback', async (req, res) => {
         <div class="card">
           <div class="icon">✓</div>
           <h1>Successfully Connected!</h1>
-          <p>Assalamu Alaikum, Mr. Shakil Ahmad. Your Google Drive has been successfully connected to your document hub. You can close this window now.</p>
+          <p>Assalamu Alaikum, Mr. Shakil Ahmad. Your Google Drive has been successfully connected to your document hub.</p>
+          <a href="https://msa-psi-sooty.vercel.app/" class="btn" style="background: linear-gradient(135deg, #E67E22, #D35400); box-shadow: 0 4px 15px rgba(211, 84, 0, 0.2); font-weight: bold; font-family: 'Segoe UI', sans-serif;">Go back to Document Hub</a>
         </div>
       </body>
       </html>
