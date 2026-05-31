@@ -185,8 +185,8 @@ app.post('/api/auth/import', async (req, res) => {
   }
   try {
     await dbRun(
-      "INSERT OR REPLACE INTO settings (key, value) VALUES ('google_tokens', ?)",
-      [JSON.stringify(tokens)]
+      "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+      ['google_tokens', JSON.stringify(tokens)]
     );
     
     // Asynchronously sweep and sync files immediately from Drive

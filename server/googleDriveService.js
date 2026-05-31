@@ -53,8 +53,8 @@ async function saveTokensFromCode(code) {
   }
 
   await dbRun(
-    "INSERT OR REPLACE INTO settings (key, value) VALUES ('google_tokens', ?)",
-    [JSON.stringify(tokens)]
+    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+    ['google_tokens', JSON.stringify(tokens)]
   );
   return tokens;
 }
@@ -76,8 +76,8 @@ async function getAuthenticatedClient() {
     console.log('Google Access Token refreshed.');
     const updatedTokens = { ...tokens, ...newTokens };
     await dbRun(
-      "INSERT OR REPLACE INTO settings (key, value) VALUES ('google_tokens', ?)",
-      [JSON.stringify(updatedTokens)]
+      "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+      ['google_tokens', JSON.stringify(updatedTokens)]
     );
   });
 
