@@ -363,6 +363,17 @@ async function downloadFileStreamFromDrive(fileId) {
   return response.data;
 }
 
+// Delete file from Google Drive
+async function deleteFromDrive(fileId) {
+  const auth = await getAuthenticatedClient();
+  const drive = google.drive({ version: 'v3', auth });
+  
+  await drive.files.delete({
+    fileId: fileId
+  });
+  console.log(`Successfully deleted file from Google Drive with ID ${fileId}`);
+}
+
 module.exports = {
   isAuthorized,
   getAuthUrl,
@@ -370,5 +381,6 @@ module.exports = {
   uploadToDrive,
   getConnectedUserEmail,
   fetchAndSyncAllFilesFromDrive,
-  downloadFileStreamFromDrive
+  downloadFileStreamFromDrive,
+  deleteFromDrive
 };

@@ -600,7 +600,7 @@ app.put('/api/documents/:id/received', async (req, res) => {
   }
 });
 
-// Delete document (removes from database and local storage. Google Drive deletion can be left intact or optionally removed)
+// Delete document (removes from database, local storage, and Google Drive cloud)
 app.delete('/api/documents/:id', async (req, res) => {
   const docId = req.params.id;
 
@@ -610,15 +610,28 @@ app.delete('/api/documents/:id', async (req, res) => {
       return res.status(404).json({ error: 'Document not found.' });
     }
 
-    // Delete local file
+    // 1. Delete from Google Drive if synced
+    if (doc.google_drive_id) {
+      try {
+        console.log(`Deleting file from Google Drive for Doc #${docId} (ID: ${doc.google_drive_id})...`);
+        const isDriveAuthorized = await googleDriveService.isAuthorized();
+        if (isDriveAuthorized) {
+          await googleDriveService.deleteFromDrive(doc.google_drive_id);
+        }
+      } catch (driveErr) {
+        console.error(`Google Drive deletion failed (continuing local deletion):`, driveErr.message);
+      }
+    }
+
+    // 2. Delete local file
     if (fs.existsSync(doc.file_path)) {
       fs.unlinkSync(doc.file_path);
     }
 
-    // Delete database entry
+    // 3. Delete database entry
     await dbRun('DELETE FROM documents WHERE id = ?', [docId]);
 
-    res.json({ success: true, message: 'Document deleted successfully from device.' });
+    res.json({ success: true, message: 'Document deleted successfully from device and Google Drive.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
