@@ -122,6 +122,41 @@ app.get('/api/auth/url', (req, res) => {
   }
 });
 
+// Export current Google Drive OAuth tokens for browser localStorage backup
+app.get('/api/auth/export', async (req, res) => {
+  try {
+    const row = await dbGet("SELECT value FROM settings WHERE key = 'google_tokens'");
+    if (row) {
+      res.json({ tokens: JSON.parse(row.value) });
+    } else {
+      res.status(404).json({ error: 'No tokens found.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Import Google Drive OAuth tokens from browser localStorage backup to self-heal connection
+app.post('/api/auth/import', async (req, res) => {
+  const { tokens } = req.body;
+  if (!tokens) {
+    return res.status(400).json({ error: 'Tokens are required.' });
+  }
+  try {
+    await dbRun(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('google_tokens', ?)",
+      [JSON.stringify(tokens)]
+    );
+    
+    // Asynchronously sweep and sync files immediately from Drive
+    googleDriveService.fetchAndSyncAllFilesFromDrive().catch(err => console.error('Import sweep error:', err.message));
+    
+    res.json({ success: true, message: 'OAuth tokens imported and connection self-healed!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // OAuth Callback handler
 app.get('/api/auth/callback', async (req, res) => {
   const code = req.query.code;
@@ -212,6 +247,16 @@ app.get('/api/auth/callback', async (req, res) => {
 // Fetch document listings with category/date filters
 app.get('/api/documents', async (req, res) => {
   const { category, month, year } = req.query;
+
+  try {
+    // Dynamically auto-recover and import any files from Google Drive in real-time
+    const isDriveAuthorized = await googleDriveService.isAuthorized();
+    if (isDriveAuthorized) {
+      await googleDriveService.fetchAndSyncAllFilesFromDrive();
+    }
+  } catch (syncErr) {
+    console.error('Real-time Google Drive sync sweep failed:', syncErr.message);
+  }
 
   let sql = 'SELECT * FROM documents WHERE 1=1';
   const params = [];

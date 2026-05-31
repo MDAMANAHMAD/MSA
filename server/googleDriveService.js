@@ -1,7 +1,7 @@
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
-const { dbGet, dbRun } = require('./database');
+const { dbGet, dbRun, dbAll } = require('./database');
 
 require('dotenv').config();
 
@@ -174,10 +174,173 @@ async function getConnectedUserEmail() {
   }
 }
 
+// Reconstruct and synchronize the database with files residing on Google Drive
+async function fetchAndSyncAllFilesFromDrive() {
+  try {
+    const isAuth = await isAuthorized();
+    if (!isAuth) {
+      console.log('Auto-recovery sweep skipped: Google Drive is not connected.');
+      return [];
+    }
+
+    const auth = await getAuthenticatedClient();
+    const drive = google.drive({ version: 'v3', auth });
+
+    // 1. Find the root folder named "MD Shakil Ahmad - Document Hub"
+    console.log('Querying Google Drive for folder structures...');
+    const rootFolderResponse = await drive.files.list({
+      q: "mimeType='application/vnd.google-apps.folder' and name='MD Shakil Ahmad - Document Hub' and trashed=false",
+      fields: 'files(id)',
+      spaces: 'drive'
+    });
+
+    const rootFolderId = rootFolderResponse.data.files[0]?.id;
+    if (!rootFolderId) {
+      console.log('No root folder structure found on Google Drive.');
+      return [];
+    }
+
+    // 2. Find all child folders (Salary Slips, Overtime, Mileage)
+    const foldersResponse = await drive.files.list({
+      q: `mimeType='application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed=false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    const folders = foldersResponse.data.files || [];
+    const folderMap = {};
+    folders.forEach(f => {
+      folderMap[f.name] = f.id;
+    });
+
+    const categories = [
+      { name: 'Salary Slips', type: 'salary_slip' },
+      { name: 'Overtime', type: 'ot' },
+      { name: 'Mileage', type: 'mileage' }
+    ];
+
+    const recoveredFiles = [];
+
+    // 3. For each category folder, scan files and check database synchronization
+    for (const cat of categories) {
+      const folderId = folderMap[cat.name];
+      if (!folderId) continue;
+
+      const filesResponse = await drive.files.list({
+        q: `'${folderId}' in parents and mimeType='application/pdf' and trashed=false`,
+        fields: 'files(id, name, createdTime)',
+        spaces: 'drive'
+      });
+
+      const driveFiles = filesResponse.data.files || [];
+      for (const file of driveFiles) {
+        // Query if file is registered in database
+        const existing = await dbGet('SELECT id FROM documents WHERE google_drive_id = ?', [file.id]);
+        if (!existing) {
+          console.log(`Auto-healing detected missing database record for Google Drive file: "${file.name}"`);
+          const metadata = parseMetadataFromFilename(file.name, cat.type, file.createdTime);
+          
+          // Reconstruct the index item into documents table
+          const insertSql = `
+            INSERT INTO documents (category, date, file_name, file_path, amount, hours, miles, google_drive_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+          
+          await dbRun(insertSql, [
+            cat.type,
+            metadata.date,
+            file.name,
+            `uploads/${file.name}`, // Reconstruct default local path
+            metadata.amount,
+            metadata.hours,
+            metadata.miles,
+            file.id
+          ]);
+          recoveredFiles.push(file.name);
+          console.log(`✓ Restored and synced database entry for: "${file.name}"`);
+        }
+      }
+    }
+    
+    if (recoveredFiles.length > 0) {
+      console.log(`Auto-recovery finished! Re-synced and restored ${recoveredFiles.length} files from Google Drive.`);
+    } else {
+      console.log('Google Drive folder structure is in sync with database. Zero entries restored.');
+    }
+    return recoveredFiles;
+
+  } catch (err) {
+    console.error('Failed to sync files from Google Drive:', err.message);
+    return [];
+  }
+}
+
+// Parse metadata values out of structured file names
+function parseMetadataFromFilename(fileName, category, createdTime) {
+  let date = createdTime ? createdTime.split('T')[0] : new Date().toISOString().split('T')[0];
+  let amount = 0;
+  let hours = 0;
+  let miles = 0;
+
+  try {
+    const cleanName = fileName.replace(/\.pdf$/i, '');
+    
+    // Parse monthly items (Salary Slip, Mileage)
+    if (category === 'salary_slip' || category === 'mileage') {
+      const parts = cleanName.split('_');
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June', 
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      const monthIndex = monthNames.indexOf(parts[0]);
+      const year = parseInt(parts[1]);
+      if (monthIndex !== -1 && !isNaN(year)) {
+        // Formulate standard date YYYY-MM-DD
+        date = `${year}-${String(monthIndex + 1).padStart(2, '0')}-01`;
+      }
+
+      if (category === 'salary_slip') {
+        const amtPart = parts[parts.length - 1];
+        if (!isNaN(parseFloat(amtPart))) amount = parseFloat(amtPart);
+      } else {
+        const milesPart = parts[parts.length - 1]?.replace('miles', '');
+        if (!isNaN(parseFloat(milesPart))) miles = parseFloat(milesPart);
+      }
+    }
+    // Parse biweekly items (OT)
+    else if (category === 'ot') {
+      // e.g. "06_Jun_to_19_Jun_2026_OT_15hrs"
+      const parts = cleanName.split('_');
+      const toIndex = parts.indexOf('to');
+      if (toIndex !== -1) {
+        const yearIndex = toIndex + 3; // "to" -> "19" -> "Jun" -> "2026"
+        const year = parseInt(parts[yearIndex]);
+        const monthStr = parts[yearIndex - 1];
+        const day = parseInt(parts[yearIndex - 2]);
+        
+        const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthIndex = monthsShort.indexOf(monthStr);
+        
+        if (!isNaN(day) && monthIndex !== -1 && !isNaN(year)) {
+          date = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+      }
+
+      const hrsPart = parts[parts.length - 1]?.replace('hrs', '');
+      if (!isNaN(parseFloat(hrsPart))) hours = parseFloat(hrsPart);
+    }
+  } catch (err) {
+    console.error('Metadata filename extraction failed, using createdTime fallback:', err.message);
+  }
+
+  return { date, amount, hours, miles };
+}
+
 module.exports = {
   isAuthorized,
   getAuthUrl,
   saveTokensFromCode,
   uploadToDrive,
-  getConnectedUserEmail
+  getConnectedUserEmail,
+  fetchAndSyncAllFilesFromDrive
 };

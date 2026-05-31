@@ -22,8 +22,50 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
     try {
       const response = await fetch(`${apiUrl}/api/auth/status`);
       const data = await response.json();
-      setDriveAuthorized(data.authorized);
-      setDriveEmail(data.email || '');
+      
+      if (data.authorized) {
+        setDriveAuthorized(true);
+        setDriveEmail(data.email || '');
+        
+        // Backup the active connection tokens inside browser's localStorage
+        try {
+          const exportResponse = await fetch(`${apiUrl}/api/auth/export`);
+          if (exportResponse.ok) {
+            const exportData = await exportResponse.json();
+            if (exportData.tokens) {
+              localStorage.setItem('msa_google_tokens', JSON.stringify(exportData.tokens));
+            }
+          }
+        } catch (exportErr) {
+          console.error('Failed to backup Google Drive connection locally:', exportErr);
+        }
+      } else {
+        // If server database wiped out but browser holds backup tokens, self-heal the login instantly!
+        const savedTokens = localStorage.getItem('msa_google_tokens');
+        if (savedTokens) {
+          try {
+            console.log('Self-healing cloud connection from browser backup...');
+            const importResponse = await fetch(`${apiUrl}/api/auth/import`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tokens: JSON.parse(savedTokens) })
+            });
+            if (importResponse.ok) {
+              // Successfully self-healed connection, query status again!
+              const retryResponse = await fetch(`${apiUrl}/api/auth/status`);
+              const retryData = await retryResponse.json();
+              setDriveAuthorized(retryData.authorized);
+              setDriveEmail(retryData.email || '');
+              return;
+            }
+          } catch (importErr) {
+            console.error('Auto-healing connection failed:', importErr);
+          }
+        }
+        
+        setDriveAuthorized(false);
+        setDriveEmail('');
+      }
     } catch (error) {
       console.error('Error checking Drive status:', error);
       setDriveAuthorized(false);
