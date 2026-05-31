@@ -336,11 +336,24 @@ function parseMetadataFromFilename(fileName, category, createdTime) {
   return { date, amount, hours, miles };
 }
 
+// Download file stream from Google Drive
+async function downloadFileStreamFromDrive(fileId) {
+  const auth = await getAuthenticatedClient();
+  const drive = google.drive({ version: 'v3', auth });
+  
+  const response = await drive.files.get(
+    { fileId: fileId, alt: 'media' },
+    { responseType: 'stream' }
+  );
+  return response.data;
+}
+
 module.exports = {
   isAuthorized,
   getAuthUrl,
   saveTokensFromCode,
   uploadToDrive,
   getConnectedUserEmail,
-  fetchAndSyncAllFilesFromDrive
+  fetchAndSyncAllFilesFromDrive,
+  downloadFileStreamFromDrive
 };

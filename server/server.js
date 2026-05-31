@@ -24,8 +24,49 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the uploads directory (allows downloading files)
-app.use('/uploads', express.static(path.join(__dirname, UPLOAD_DIR)));
+// Custom file serving with automatic real-time Google Drive streaming fallback
+app.get('/uploads/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  const localPath = path.join(__dirname, UPLOAD_DIR, filename);
+
+  // 1. If the file exists physically on Render's local disk, serve it instantly!
+  if (fs.existsSync(localPath)) {
+    return res.sendFile(localPath);
+  }
+
+  // 2. If the file does not exist locally (e.g. disk was wiped), auto-stream from Google Drive!
+  try {
+    console.log(`Local file "${filename}" is missing. Scanning database for cloud backups...`);
+    const doc = await dbGet(
+      "SELECT * FROM documents WHERE file_name = ? OR file_path LIKE ?",
+      [filename, `%/${filename}`]
+    );
+
+    if (doc && doc.google_drive_id) {
+      console.log(`Auto-healing: streaming Doc #${doc.id} ("${doc.file_name}") directly from Google Drive...`);
+      const isDriveAuthorized = await googleDriveService.isAuthorized();
+      if (isDriveAuthorized) {
+        const stream = await googleDriveService.downloadFileStreamFromDrive(doc.google_drive_id);
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${doc.file_name}"`);
+        
+        stream
+          .on('error', (streamErr) => {
+            console.error('Error during Google Drive inline stream:', streamErr.message);
+            res.status(500).send('Error streaming document from cloud.');
+          })
+          .pipe(res);
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('Auto-healing file stream failed:', error.message);
+  }
+
+  // 3. Absolute Fallback: Not found
+  res.status(404).send(`Cannot GET /uploads/${filename}`);
+});
 
 // Setup Multer for file uploading
 const storage = multer.diskStorage({
