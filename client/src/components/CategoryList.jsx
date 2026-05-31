@@ -48,6 +48,19 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     return filepath.replace(/\\/g, '/').split('/').pop();
   };
 
+  const formatDateToDDMMYYYY = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   // --- LONG-PRESS TRIGGER LOGIC ---
   const handleStartPress = (doc) => {
     // Only OT supports the Orange/Green received status toggle
@@ -356,7 +369,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
                     </div>
                     <div className="document-meta">
                       <h4>{getDocumentDisplayTitle(doc)}</h4>
-                      <p>{new Date(doc.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                      <p>{formatDateToDDMMYYYY(doc.date)}</p>
                       
                       <div className="badge-row">
                         {isOt && (

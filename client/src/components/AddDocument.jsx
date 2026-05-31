@@ -1,40 +1,82 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, FileText, ArrowLeft, Loader2, DollarSign, Clock, Navigation, CheckCircle, Trash2, Upload, AlertCircle } from 'lucide-react';
+import { FileText, ArrowLeft, Loader2, DollarSign, Clock, Navigation, CheckCircle, Trash2, Upload, AlertCircle, Calendar } from 'lucide-react';
 
 export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess }) {
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [pdfFiles, setPdfFiles] = useState([]); // File queue: [{ file, id, status: 'pending'|'uploading'|'completed'|'failed', error: '' }]
-  const [metricValue, setMetricValue] = useState('');
+  const [pdfFiles, setPdfFiles] = useState([]); // File queue: [{ file, id, status, error, month, year, otDate, fyStartYear, metric }]
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
 
-  // Auto 15-day calculation details (only for Overtime OT)
-  const [rangePreview, setRangePreview] = useState('');
+  // Month options list
+  const monthsList = [
+    { value: '01', name: 'January' },
+    { value: '02', name: 'February' },
+    { value: '03', name: 'March' },
+    { value: '04', name: 'April' },
+    { value: '05', name: 'May' },
+    { value: '06', name: 'June' },
+    { value: '07', name: 'July' },
+    { value: '08', name: 'August' },
+    { value: '09', name: 'September' },
+    { value: '10', name: 'October' },
+    { value: '11', name: 'November' },
+    { value: '12', name: 'December' },
+  ];
 
-  useEffect(() => {
-    if (category === 'ot') {
-      try {
-        const endDate = new Date(date);
-        if (!isNaN(endDate.getTime())) {
-          const startDate = new Date(endDate);
-          startDate.setDate(endDate.getDate() - 13);
+  // Year options list (2020 to 2040)
+  const yearsList = Array.from({ length: 21 }, (_, i) => String(2020 + i));
 
-          const formatDateReadable = (d) => {
-            const options = { day: '2-digit', month: 'short', year: 'numeric' };
-            return d.toLocaleDateString('en-GB', options);
-          };
+  // Financial Year options list (e.g., 2024-2025 maps to '24 - 2025')
+  const fyList = Array.from({ length: 15 }, (_, i) => {
+    const start = 2020 + i;
+    const end = start + 1;
+    const shortStart = String(start).slice(-2);
+    return { value: String(start), label: `${shortStart} - ${end}` };
+  });
 
-          setRangePreview(`Automatically calculated cycle period:\n${formatDateReadable(startDate)} to ${formatDateReadable(endDate)} (14 Days)`);
-        }
-      } catch (err) {
-        setRangePreview('');
-      }
-    } else {
-      setRangePreview('');
+  // Calculate default values based on current time
+  const getDefaultState = (file) => {
+    const now = new Date();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const currentYear = String(now.getFullYear());
+    const otDate = now.toISOString().split('T')[0];
+    
+    // Financial year start year calculation
+    const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+
+    return {
+      file,
+      id: Math.random().toString(36).substring(2, 9),
+      status: 'pending',
+      error: '',
+      month: currentMonth,
+      year: currentYear,
+      otDate: otDate,
+      fyStartYear: String(fyStart),
+      metric: ''
+    };
+  };
+
+  // Helper to calculate OT range preview for a specific date
+  const getOtRangePreview = (dateStr) => {
+    try {
+      const endDate = new Date(dateStr);
+      if (isNaN(endDate.getTime())) return '';
+      const startDate = new Date(endDate);
+      startDate.setDate(endDate.getDate() - 13);
+
+      const formatDateReadable = (d) => {
+        const day = String(d.getDate()).padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+      };
+
+      return `${formatDateReadable(startDate)} to ${formatDateReadable(endDate)} (14 Days)`;
+    } catch (e) {
+      return '';
     }
-  }, [date, category]);
+  };
 
   // Handle drag over the upload zone
   const handleDragOver = (e) => {
@@ -58,13 +100,7 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
       setError('Only PDF files are allowed! Non-PDF files were skipped.');
     }
 
-    const newQueueItems = validFiles.map(file => ({
-      file,
-      id: Math.random().toString(36).substring(2, 9),
-      status: 'pending',
-      error: ''
-    }));
-
+    const newQueueItems = validFiles.map(file => getDefaultState(file));
     setPdfFiles(prev => [...prev, ...newQueueItems]);
   };
 
@@ -97,6 +133,13 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
     setError('');
   };
 
+  // Update specific metadata on an individual queue item
+  const updateQueueItem = (id, fields) => {
+    setPdfFiles(prev =>
+      prev.map(item => item.id === id ? { ...item, ...fields } : item)
+    );
+  };
+
   // Handle sequential upload submission (one by one)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -124,14 +167,25 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
         prev.map(f => f.id === item.id ? { ...f, status: 'uploading' } : f)
       );
 
+      // Reconstruct standard YYYY-MM-DD date based on category
+      let uploadDate = '';
+      if (category === 'salary_slip' || category === 'mileage') {
+        uploadDate = `${item.year}-${item.month}-01`;
+      } else if (category === 'itr') {
+        uploadDate = `${item.fyStartYear}-04-01`; // Store April 1st of starting financial year
+      } else {
+        // Overtime (OT) uses exact date
+        uploadDate = item.otDate;
+      }
+
       const formData = new FormData();
       formData.append('pdf', item.file);
       formData.append('category', category);
-      formData.append('date', date);
+      formData.append('date', uploadDate);
 
-      if (category === 'salary_slip') formData.append('amount', metricValue || 0);
-      if (category === 'ot') formData.append('hours', metricValue || 0);
-      if (category === 'mileage') formData.append('miles', metricValue || 0);
+      if (category === 'salary_slip') formData.append('amount', item.metric || 0);
+      if (category === 'ot') formData.append('hours', item.metric || 0);
+      if (category === 'mileage') formData.append('miles', item.metric || 0);
 
       try {
         const response = await fetch(`${apiUrl}/api/documents/upload`, {
@@ -173,11 +227,11 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
   };
 
   const getCategoryTitle = () => {
-    if (category === 'salary_slip') return 'Salary Slip';
+    if (category === 'salary_slip') return 'Salary Slips';
     if (category === 'ot') return 'Overtime (OT)';
     if (category === 'mileage') return 'Mileage';
-    if (category === 'itr') return 'ITR Projection';
-    return 'Document';
+    if (category === 'itr') return 'ITR Projections';
+    return 'Documents';
   };
 
   return (
@@ -217,14 +271,14 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              style={{ minHeight: '160px', justifyContent: 'center' }}
+              style={{ minHeight: '140px', justifyContent: 'center' }}
             >
               {pdfFiles.length > 0 ? (
                 <>
                   <CheckCircle size={44} style={{ color: '#27AE60' }} />
-                  <p style={{ color: '#27AE60', margin: 0 }}>PDFs Selected!</p>
-                  <span style={{ fontWeight: '500', color: '#27AE60', fontSize: '0.85rem' }}>
-                    {pdfFiles.length} file(s) in queue. Tap or drag more to add.
+                  <p style={{ color: '#27AE60', margin: 0 }}>PDFs Added!</p>
+                  <span style={{ fontWeight: '500', color: '#27AE60', fontSize: '0.82rem' }}>
+                    {pdfFiles.length} file(s) in queue. Adjust settings below, or tap here to add more.
                   </span>
                 </>
               ) : (
@@ -237,12 +291,12 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
             </div>
           </div>
 
-          {/* Interactive Batch Queue List */}
+          {/* Interactive Batch Queue List with Individual Settings */}
           {pdfFiles.length > 0 && (
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-dark)' }}>
-                  Upload Queue ({pdfFiles.length})
+                  Upload Settings per Document
                 </span>
                 {!loading && (
                   <button
@@ -265,210 +319,266 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                 )}
               </div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
                 {pdfFiles.map((item) => (
                   <div
                     key={item.id}
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
+                      flexDirection: 'column',
+                      padding: '14px',
+                      borderRadius: '16px',
                       backgroundColor: 'white',
                       border: '1px solid var(--color-border)',
                       boxShadow: 'var(--shadow-sm)',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      gap: '12px'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1 }}>
-                      <FileText size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: '600', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '240px', color: 'var(--text-dark)' }}>
-                          {item.file.name}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                          {(item.file.size / 1024 / 1024).toFixed(2)} MB
-                        </span>
+                    {/* Header Row: File Details & Status */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                        <FileText size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '700', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '240px', color: 'var(--text-dark)' }}>
+                            {item.file.name}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {(item.file.size / 1024 / 1024).toFixed(2)} MB
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        {item.status === 'pending' && (
+                          <span className="badge local" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>Pending</span>
+                        )}
+                        {item.status === 'uploading' && (
+                          <span className="badge pending" style={{ fontSize: '0.7rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Loader2 size={10} className="animate-spin" /> uploading...
+                          </span>
+                        )}
+                        {item.status === 'completed' && (
+                          <span className="badge synced" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>✓ Saved</span>
+                        )}
+                        {item.status === 'failed' && (
+                          <span 
+                            className="badge local" 
+                            style={{ 
+                              fontSize: '0.7rem', 
+                              padding: '3px 8px', 
+                              backgroundColor: 'var(--color-danger-light)', 
+                              color: 'var(--color-danger)', 
+                              border: 'none',
+                              cursor: 'help'
+                            }} 
+                            title={item.error}
+                          >
+                            Failed
+                          </span>
+                        )}
+
+                        {/* Remove from queue button */}
+                        {!loading && item.status !== 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => removeFileFromQueue(item.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      {/* Interactive Status Badges */}
-                      {item.status === 'pending' && (
-                        <span className="badge local" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>Pending</span>
-                      )}
-                      {item.status === 'uploading' && (
-                        <span className="badge pending" style={{ fontSize: '0.7rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Loader2 size={10} className="animate-spin" /> uploading...
-                        </span>
-                      )}
-                      {item.status === 'completed' && (
-                        <span className="badge synced" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>✓ Saved</span>
-                      )}
-                      {item.status === 'failed' && (
-                        <span 
-                          className="badge local" 
-                          style={{ 
-                            fontSize: '0.7rem', 
-                            padding: '3px 8px', 
-                            backgroundColor: 'var(--color-danger-light)', 
-                            color: 'var(--color-danger)', 
-                            border: 'none',
-                            cursor: 'help'
-                          }} 
-                          title={item.error}
-                        >
-                          Failed
-                        </span>
+
+                    {/* Interactive Form Settings Block per File */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
+                      
+                      {/* 1. Date/Period Selectors */}
+                      
+                      {/* For Salary Slip & Mileage: Select Month and Year only */}
+                      {(category === 'salary_slip' || category === 'mileage') && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Period (Month & Year)</label>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <select
+                              className="select-control"
+                              value={item.month}
+                              onChange={(e) => updateQueueItem(item.id, { month: e.target.value })}
+                              style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', height: 'auto', minHeight: 'auto' }}
+                              disabled={loading || item.status === 'completed'}
+                            >
+                              {monthsList.map(m => (
+                                <option key={m.value} value={m.value}>{m.name}</option>
+                              ))}
+                            </select>
+
+                            <select
+                              className="select-control"
+                              value={item.year}
+                              onChange={(e) => updateQueueItem(item.id, { year: e.target.value })}
+                              style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', height: 'auto', minHeight: 'auto' }}
+                              disabled={loading || item.status === 'completed'}
+                            >
+                              {yearsList.map(y => (
+                                <option key={y} value={y}>{y}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       )}
 
-                      {/* Remove from queue button */}
-                      {!loading && item.status !== 'completed' && (
-                        <button
-                          type="button"
-                          onClick={() => removeFileFromQueue(item.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.85rem'
-                          }}
-                        >
-                          ✕
-                        </button>
+                      {/* For ITR Projections: Select Year Range only (e.g. 25 - 2026) */}
+                      {category === 'itr' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Financial Year Range</label>
+                          <select
+                            className="select-control"
+                            value={item.fyStartYear}
+                            onChange={(e) => updateQueueItem(item.id, { fyStartYear: e.target.value })}
+                            style={{ padding: '8px 10px', fontSize: '0.82rem', height: 'auto', minHeight: 'auto' }}
+                            disabled={loading || item.status === 'completed'}
+                          >
+                            {fyList.map(fy => (
+                              <option key={fy.value} value={fy.value}>{fy.label}</option>
+                            ))}
+                          </select>
+                        </div>
                       )}
+
+                      {/* For Overtime (OT): Select exact calendar Date */}
+                      {category === 'ot' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Document Date</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="date"
+                              className="input-control"
+                              value={item.otDate}
+                              onChange={(e) => updateQueueItem(item.id, { otDate: e.target.value })}
+                              required
+                              style={{ paddingLeft: '36px', paddingRight: '10px', paddingTop: '8px', paddingBottom: '8px', fontSize: '0.82rem', minHeight: 'auto' }}
+                              disabled={loading || item.status === 'completed'}
+                            />
+                            <Calendar
+                              size={16}
+                              style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '10px',
+                                color: 'var(--text-muted)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--accent-ot)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--accent-ot-light)', padding: '6px 10px', borderRadius: '8px' }}>
+                            <Calendar size={12} style={{ flexShrink: 0 }} />
+                            <span>Cycle: {getOtRangePreview(item.otDate)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Dynamic Metric Numeric Input per File */}
+                      
+                      {category === 'salary_slip' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Net Salary Amount (Optional)</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="number"
+                              step="any"
+                              pattern="[0-9]*"
+                              inputMode="decimal"
+                              className="input-control"
+                              placeholder="Enter amount"
+                              value={item.metric}
+                              onChange={(e) => updateQueueItem(item.id, { metric: e.target.value })}
+                              style={{ paddingLeft: '36px', paddingRight: '10px', paddingTop: '8px', paddingBottom: '8px', fontSize: '0.82rem', minHeight: 'auto' }}
+                              disabled={loading || item.status === 'completed'}
+                            />
+                            <DollarSign
+                              size={16}
+                              style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '10px',
+                                color: 'var(--text-muted)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {category === 'ot' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Overtime Hours (Optional)</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="number"
+                              step="any"
+                              pattern="[0-9]*"
+                              inputMode="decimal"
+                              className="input-control"
+                              placeholder="Enter hours (e.g. 8.5)"
+                              value={item.metric}
+                              onChange={(e) => updateQueueItem(item.id, { metric: e.target.value })}
+                              style={{ paddingLeft: '36px', paddingRight: '10px', paddingTop: '8px', paddingBottom: '8px', fontSize: '0.82rem', minHeight: 'auto' }}
+                              disabled={loading || item.status === 'completed'}
+                            />
+                            <Clock
+                              size={16}
+                              style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '10px',
+                                color: 'var(--text-muted)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {category === 'mileage' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Miles Driven (Optional)</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="number"
+                              step="any"
+                              pattern="[0-9]*"
+                              inputMode="decimal"
+                              className="input-control"
+                              placeholder="Enter miles (e.g. 120)"
+                              value={item.metric}
+                              onChange={(e) => updateQueueItem(item.id, { metric: e.target.value })}
+                              style={{ paddingLeft: '36px', paddingRight: '10px', paddingTop: '8px', paddingBottom: '8px', fontSize: '0.82rem', minHeight: 'auto' }}
+                              disabled={loading || item.status === 'completed'}
+                            />
+                            <Navigation
+                              size={16}
+                              style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '10px',
+                                color: 'var(--text-muted)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* Date Picker */}
-          <div className="form-group">
-            <label htmlFor="docDate">Document Date</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                id="docDate"
-                type="date"
-                className="input-control"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                style={{ paddingLeft: '44px' }}
-                disabled={loading}
-              />
-              <Calendar
-                size={20}
-                style={{
-                  position: 'absolute',
-                  left: '14px',
-                  top: '16px',
-                  color: 'var(--text-muted)'
-                }}
-              />
-            </div>
-            {rangePreview && (
-              <div className="preview-alert" style={{ marginTop: '10px' }}>
-                <Calendar size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-                <span style={{ whiteSpace: 'pre-line' }}>{rangePreview}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Dynamic Numeric Metric Input */}
-          {category === 'salary_slip' && (
-            <div className="form-group">
-              <label htmlFor="salaryAmount">Net Salary Amount (Optional)</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  id="salaryAmount"
-                  type="number"
-                  step="any"
-                  pattern="[0-9]*"
-                  inputMode="decimal"
-                  className="input-control"
-                  placeholder="Enter amount"
-                  value={metricValue}
-                  onChange={(e) => setMetricValue(e.target.value)}
-                  style={{ paddingLeft: '44px' }}
-                  disabled={loading}
-                />
-                <DollarSign
-                  size={20}
-                  style={{
-                    position: 'absolute',
-                    left: '14px',
-                    top: '16px',
-                    color: 'var(--text-muted)'
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {category === 'ot' && (
-            <div className="form-group">
-              <label htmlFor="otHours">Overtime Hours (Optional)</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  id="otHours"
-                  type="number"
-                  step="any"
-                  pattern="[0-9]*"
-                  inputMode="decimal"
-                  className="input-control"
-                  placeholder="Enter hours (e.g. 8.5)"
-                  value={metricValue}
-                  onChange={(e) => setMetricValue(e.target.value)}
-                  style={{ paddingLeft: '44px' }}
-                  disabled={loading}
-                />
-                <Clock
-                  size={20}
-                  style={{
-                    position: 'absolute',
-                    left: '14px',
-                    top: '16px',
-                    color: 'var(--text-muted)'
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {category === 'mileage' && (
-            <div className="form-group">
-              <label htmlFor="mileageMiles">Miles Driven (Optional)</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  id="mileageMiles"
-                  type="number"
-                  step="any"
-                  pattern="[0-9]*"
-                  inputMode="decimal"
-                  className="input-control"
-                  placeholder="Enter miles (e.g. 120)"
-                  value={metricValue}
-                  onChange={(e) => setMetricValue(e.target.value)}
-                  style={{ paddingLeft: '44px' }}
-                  disabled={loading}
-                />
-                <Navigation
-                  size={20}
-                  style={{
-                    position: 'absolute',
-                    left: '14px',
-                    top: '16px',
-                    color: 'var(--text-muted)'
-                  }}
-                />
               </div>
             </div>
           )}
