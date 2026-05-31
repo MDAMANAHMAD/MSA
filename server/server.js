@@ -258,29 +258,37 @@ app.get('/api/documents', async (req, res) => {
     console.error('Real-time Google Drive sync sweep failed:', syncErr.message);
   }
 
-  let sql = 'SELECT * FROM documents WHERE 1=1';
+  // Deduplicate: Select only the latest file (highest ID) if there are multiple documents with the same date
+  let sql = `
+    SELECT * FROM documents d1 
+    WHERE d1.id = (
+      SELECT MAX(d2.id) 
+      FROM documents d2 
+      WHERE d2.category = d1.category AND d2.date = d1.date
+    )
+  `;
   const params = [];
 
   if (category) {
-    sql += ' AND category = ?';
+    sql += ' AND d1.category = ?';
     params.push(category);
   }
 
   if (month && year) {
     // Match date starting with YYYY-MM
-    sql += " AND date LIKE ?";
+    sql += " AND d1.date LIKE ?";
     params.push(`${year}-${month}%`);
   } else if (year) {
     // Match date starting with YYYY
-    sql += " AND date LIKE ?";
+    sql += " AND d1.date LIKE ?";
     params.push(`${year}%`);
   } else if (month) {
     // Match date containing -MM-
-    sql += " AND date LIKE ?";
+    sql += " AND d1.date LIKE ?";
     params.push(`%-${month}-%`);
   }
 
-  sql += ' ORDER BY date ASC, id ASC';
+  sql += ' ORDER BY d1.date ASC, d1.id ASC';
 
   try {
     const documents = await dbAll(sql, params);
