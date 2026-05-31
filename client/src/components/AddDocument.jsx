@@ -154,75 +154,94 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
     let successCount = 0;
     let failCount = 0;
 
-    // Loop through files sequentially (one-by-one)
-    for (let i = 0; i < pdfFiles.length; i++) {
-      const item = pdfFiles[i];
-      if (item.status === 'completed') {
-        successCount++;
-        continue; // Skip already successfully uploaded files
-      }
-
-      // Mark the current file as uploading
-      setPdfFiles(prev =>
-        prev.map(f => f.id === item.id ? { ...f, status: 'uploading' } : f)
-      );
-
-      // Reconstruct standard YYYY-MM-DD date based on category
-      let uploadDate = '';
-      if (category === 'salary_slip' || category === 'mileage') {
-        uploadDate = `${item.year}-${item.month}-01`;
-      } else if (category === 'itr') {
-        uploadDate = `${item.fyStartYear}-04-01`; // Store April 1st of starting financial year
-      } else {
-        // Overtime (OT) uses exact date
-        uploadDate = item.otDate;
-      }
-
-      const formData = new FormData();
-      formData.append('pdf', item.file);
-      formData.append('category', category);
-      formData.append('date', uploadDate);
-
-      if (category === 'salary_slip') formData.append('amount', item.metric || 0);
-      if (category === 'ot') formData.append('hours', item.metric || 0);
-      if (category === 'mileage') formData.append('miles', item.metric || 0);
-
-      try {
-        const response = await fetch(`${apiUrl}/api/documents/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Server upload failed.');
+    try {
+      // Loop through files sequentially (one-by-one)
+      for (let i = 0; i < pdfFiles.length; i++) {
+        const item = pdfFiles[i];
+        if (item.status === 'completed') {
+          successCount++;
+          continue; // Skip already successfully uploaded files
         }
 
-        // Mark the current file as completed
+        // Mark the current file as uploading
         setPdfFiles(prev =>
-          prev.map(f => f.id === item.id ? { ...f, status: 'completed' } : f)
+          prev.map(f => f.id === item.id ? { ...f, status: 'uploading' } : f)
         );
-        successCount++;
-      } catch (err) {
-        console.error('File upload failed:', err.message);
-        // Mark the current file as failed
-        setPdfFiles(prev =>
-          prev.map(f => f.id === item.id ? { ...f, status: 'failed', error: err.message || 'Upload failed' } : f)
-        );
-        failCount++;
+
+        console.log(`[MSA Hub] Uploading file ${i + 1}/${pdfFiles.length}: "${item.file.name}"...`);
+
+        // Reconstruct standard YYYY-MM-DD date based on category
+        let uploadDate = '';
+        if (category === 'salary_slip' || category === 'mileage') {
+          uploadDate = `${item.year}-${item.month}-01`;
+        } else if (category === 'itr') {
+          uploadDate = `${item.fyStartYear}-04-01`; // Store April 1st of starting financial year
+        } else {
+          // Overtime (OT) uses exact date
+          uploadDate = item.otDate;
+        }
+
+        const formData = new FormData();
+        formData.append('pdf', item.file);
+        formData.append('category', category);
+        formData.append('date', uploadDate);
+
+        if (category === 'salary_slip') formData.append('amount', item.metric || 0);
+        if (category === 'ot') formData.append('hours', item.metric || 0);
+        if (category === 'mileage') formData.append('miles', item.metric || 0);
+
+        // AbortController timeout of 35 seconds per request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+        try {
+          const response = await fetch(`${apiUrl}/api/documents/upload`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Server upload failed.');
+          }
+
+          console.log(`[MSA Hub] Upload successful for: "${item.file.name}"`);
+
+          // Mark the current file as completed
+          setPdfFiles(prev =>
+            prev.map(f => f.id === item.id ? { ...f, status: 'completed' } : f)
+          );
+          successCount++;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          const errorMsg = err.name === 'AbortError' ? 'Upload timed out (35s).' : err.message;
+          console.error(`[MSA Hub] Upload failed for "${item.file.name}":`, errorMsg);
+          
+          // Mark the current file as failed
+          setPdfFiles(prev =>
+            prev.map(f => f.id === item.id ? { ...f, status: 'failed', error: errorMsg || 'Upload failed' } : f)
+          );
+          failCount++;
+        }
       }
-    }
 
-    setLoading(false);
-
-    if (failCount === 0) {
-      onSaveSuccess(
-        pdfFiles.length > 1
-          ? `✓ Successfully saved and synced all ${successCount} documents to Google Drive!`
-          : '✓ Document uploaded and synced successfully!'
-      );
-    } else {
-      setError(`Batch complete: Saved ${successCount} successfully, but ${failCount} failed. Please check individual file errors below.`);
+      if (failCount === 0) {
+        onSaveSuccess(
+          pdfFiles.length > 1
+            ? `✓ Successfully saved and synced all ${successCount} documents to Google Drive!`
+            : '✓ Document uploaded and synced successfully!'
+        );
+      } else {
+        setError(`Batch complete: Saved ${successCount} successfully, but ${failCount} failed. Please check individual file errors below.`);
+      }
+    } catch (globalErr) {
+      console.error('[MSA Hub] Global batch upload error:', globalErr);
+      setError(`An unexpected error occurred during batch upload: ${globalErr.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
