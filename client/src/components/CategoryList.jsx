@@ -231,6 +231,15 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
           return `${formatShort(startDate)} to ${formatLong(endDate)}`; // e.g. "17 May to 30 May 2026"
         }
       } catch (e) {}
+    } else if (category === 'itr') {
+      try {
+        const cleanName = doc.file_name.replace(/\.pdf$/i, '');
+        const parts = cleanName.split('_');
+        const fyStr = parts[0]; // e.g. "25-2026"
+        return `ITR Projection FY ${fyStr}`;
+      } catch (e) {
+        return 'ITR Projection';
+      }
     }
     return doc.file_name;
   };
@@ -239,6 +248,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     if (category === 'salary_slip') return 'Salary Slips';
     if (category === 'ot') return 'Overtime (OT)';
     if (category === 'mileage') return 'Mileage Records';
+    if (category === 'itr') return 'ITR Projections';
     return 'Documents';
   };
 

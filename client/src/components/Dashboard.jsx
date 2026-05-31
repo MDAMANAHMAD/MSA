@@ -190,6 +190,20 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
             <ChevronRight className="arrow-icon" size={20} />
           </div>
 
+          {/* ITR Projections Folder */}
+          <div className="category-card itr" onClick={() => onCategoryClick('itr')}>
+            <div className="category-info">
+              <div className="category-icon-wrapper">
+                <Folder size={26} />
+              </div>
+              <div className="category-details">
+                <h3>ITR Projections</h3>
+                <p>Manage ITR Projection PDFs</p>
+              </div>
+            </div>
+            <ChevronRight className="arrow-icon" size={20} />
+          </div>
+
           {/* Designed & Developed Credit */}
           <div style={{ 
             textAlign: 'center', 

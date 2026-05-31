@@ -12,6 +12,8 @@
   --accent-ot-light: #FEF5E7;
   --accent-mileage: #3498DB;
   --accent-mileage-light: #EBF5FB;
+  --accent-itr: #9B59B6;
+  --accent-itr-light: #F4ECF7;
   --color-danger: #E74C3C;
   --color-danger-light: #FDEDEC;
   --color-border: #E8E6E2;
@@ -211,6 +213,9 @@ body {
 .category-card.mileage {
   border-left: 6px solid var(--accent-mileage);
 }
+.category-card.itr {
+  border-left: 6px solid var(--accent-itr);
+}
 
 .category-info {
   display: flex;
@@ -240,6 +245,11 @@ body {
 .mileage .category-icon-wrapper {
   background-color: var(--accent-mileage-light);
   color: var(--accent-mileage);
+}
+
+.itr .category-icon-wrapper {
+  background-color: var(--accent-itr-light);
+  color: var(--accent-itr);
 }
 
 .category-details h3 {
@@ -573,6 +583,13 @@ body {
 .file-upload-box:active {
   background-color: var(--bg-cream);
   border-color: var(--text-dark);
+}
+
+.file-upload-box.dragging {
+  border-color: var(--text-dark) !important;
+  background-color: var(--bg-cream) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .file-upload-box.selected {

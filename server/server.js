@@ -405,6 +405,19 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
         console.error('Failed to calculate 15-day range, using fallback:', dateErr.message);
         friendlyName = `${date}_OT_${hours || 0}hrs.pdf`;
       }
+    } else if (category === 'itr') {
+      try {
+        const d = new Date(date);
+        if (!isNaN(d.getTime())) {
+          const startingYear = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+          const endingYear = startingYear + 1;
+          const shortStart = String(startingYear).slice(-2);
+          friendlyName = `${shortStart}-${endingYear}_ITR_Projection.pdf`;
+        }
+      } catch (dateErr) {
+        console.error('Failed to calculate ITR financial year, using fallback:', dateErr.message);
+        friendlyName = `${date}_ITR_Projection.pdf`;
+      }
     }
 
     // 1. Insert into local SQLite database first

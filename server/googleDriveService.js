@@ -131,6 +131,7 @@ async function uploadToDrive(localFilePath, fileName, category) {
   let folderName = 'Salary Slips';
   if (category === 'ot') folderName = 'Overtime';
   if (category === 'mileage') folderName = 'Mileage';
+  if (category === 'itr') folderName = 'ITR Projections';
 
   // 3. Get or create category folder
   const categoryFolderId = await getOrCreateFolder(drive, folderName, rootFolderId);
@@ -216,7 +217,8 @@ async function fetchAndSyncAllFilesFromDrive() {
     const categories = [
       { name: 'Salary Slips', type: 'salary_slip' },
       { name: 'Overtime', type: 'ot' },
-      { name: 'Mileage', type: 'mileage' }
+      { name: 'Mileage', type: 'mileage' },
+      { name: 'ITR Projections', type: 'itr' }
     ];
 
     const recoveredFiles = [];
@@ -328,6 +330,19 @@ function parseMetadataFromFilename(fileName, category, createdTime) {
 
       const hrsPart = parts[parts.length - 1]?.replace('hrs', '');
       if (!isNaN(parseFloat(hrsPart))) hours = parseFloat(hrsPart);
+    }
+    else if (category === 'itr') {
+      // e.g. "25-2026_ITR_Projection"
+      const parts = cleanName.split('_');
+      const fyStr = parts[0]; // "25-2026"
+      const fyParts = fyStr.split('-');
+      if (fyParts.length === 2) {
+        const endingYear = parseInt(fyParts[1]);
+        if (!isNaN(endingYear)) {
+          const startingYear = endingYear - 1;
+          date = `${startingYear}-04-01`;
+        }
+      }
     }
   } catch (err) {
     console.error('Metadata filename extraction failed, using createdTime fallback:', err.message);
