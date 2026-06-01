@@ -52,19 +52,6 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
       if (data.authorized) {
         setDriveAuthorized(true);
         setDriveEmail(data.email || '');
-        
-        // Backup the active connection tokens inside browser's localStorage
-        try {
-          const exportResponse = await fetch(`${apiUrl}/api/auth/export`);
-          if (exportResponse.ok) {
-            const exportData = await exportResponse.json();
-            if (exportData.tokens) {
-              localStorage.setItem('msa_google_tokens', JSON.stringify(exportData.tokens));
-            }
-          }
-        } catch (exportErr) {
-          console.error('Failed to backup Google Drive connection locally:', exportErr);
-        }
       } else {
         // If server database wiped out but browser holds backup tokens, self-heal the login instantly!
         const savedTokens = localStorage.getItem('msa_google_tokens');

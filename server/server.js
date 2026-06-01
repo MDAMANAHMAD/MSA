@@ -163,19 +163,7 @@ app.get('/api/auth/url', (req, res) => {
   }
 });
 
-// Export current Google Drive OAuth tokens for browser localStorage backup
-app.get('/api/auth/export', async (req, res) => {
-  try {
-    const row = await dbGet("SELECT value FROM settings WHERE key = 'google_tokens'");
-    if (row) {
-      res.json({ tokens: JSON.parse(row.value) });
-    } else {
-      res.status(404).json({ error: 'No tokens found.' });
-    }
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Export current Google Drive OAuth tokens has been deprecated and disabled for device-level security.
 
 // Import Google Drive OAuth tokens from browser localStorage backup to self-heal connection
 app.post('/api/auth/import', async (req, res) => {
@@ -206,12 +194,14 @@ app.get('/api/auth/callback', async (req, res) => {
   }
 
   try {
-    await googleDriveService.saveTokensFromCode(code);
+    const tokens = await googleDriveService.saveTokensFromCode(code);
     
     // Safely trigger background sweep immediately after successful connection
     syncAllUnsyncedDocuments().catch(err => console.error('Callback auto-sync error:', err.message));
     
-    // Serve a beautiful success page to your dad on his phone browser
+    const targetUrl = `https://msa-psi-sooty.vercel.app/?auth_tokens=${encodeURIComponent(JSON.stringify(tokens))}`;
+
+    // Serve a beautiful success page to your dad on his phone browser with secure auto-redirect
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -264,15 +254,26 @@ app.get('/api/auth/callback', async (req, res) => {
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
+            transition: all 0.2s ease;
+          }
+          .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
           }
         </style>
+        <script>
+          // Automatic seamless redirect to frontend with tokens after 1.5 seconds
+          setTimeout(function() {
+            window.location.href = "${targetUrl}";
+          }, 1500);
+        </script>
       </head>
       <body>
         <div class="card">
           <div class="icon">✓</div>
           <h1>Successfully Connected!</h1>
-          <p>Assalamu Alaikum, Mr. Shakil Ahmad. Your Google Drive has been successfully connected to your document hub.</p>
-          <a href="https://msa-psi-sooty.vercel.app/" class="btn" style="background: linear-gradient(135deg, #E67E22, #D35400); box-shadow: 0 4px 15px rgba(211, 84, 0, 0.2); font-weight: bold; font-family: 'Segoe UI', sans-serif;">Go back to Document Hub</a>
+          <p>Assalamu Alaikum, Mr. Shakil Ahmad. Your Google Drive has been successfully connected and this device is now authorized.</p>
+          <a href="${targetUrl}" class="btn" style="background: linear-gradient(135deg, #E67E22, #D35400); box-shadow: 0 4px 15px rgba(211, 84, 0, 0.2); font-weight: bold; font-family: 'Segoe UI', sans-serif;">Go back to Document Hub</a>
         </div>
       </body>
       </html>
