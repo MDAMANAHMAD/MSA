@@ -36,6 +36,43 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
     };
   }, [apiUrl]);
 
+  // Active background polling interval (every 4s) to automatically verify and restore connection when offline
+  useEffect(() => {
+    if (isOnline && !apiError) return;
+
+    const interval = setInterval(async () => {
+      // 1. Check local network adapter status first
+      if (!navigator.onLine) {
+        setIsOnline(false);
+        return;
+      }
+
+      // 2. Perform a real-time server check to ensure full internet + server reachability
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 seconds timeout
+
+        const response = await fetch(`${apiUrl}/api/auth/status`, {
+          method: 'GET',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          console.log('[MSA Hub] Active polling: internet and server connection restored!');
+          setIsOnline(true);
+          setApiError(false);
+          checkDriveStatus(); // Re-verify credentials and refresh home screen
+        }
+      } catch (err) {
+        // Server still unreachable or no actual internet traffic
+        console.log('[MSA Hub] Active polling: still offline or disconnected.');
+      }
+    }, 4000); // Polls every 4 seconds (within the 3-5s range requested)
+
+    return () => clearInterval(interval);
+  }, [isOnline, apiError, apiUrl]);
+
   const checkDriveStatus = async () => {
     if (!navigator.onLine) {
       setIsOnline(false);
