@@ -102,7 +102,7 @@ function DeviceLockScreen({ apiUrl, onAuthorize }) {
           fontWeight: '500',
           textAlign: 'center'
         }}>
-          Assalamu Alaikum. This device is currently <strong>unauthorized</strong> to view the records. Please connect your Google Drive account to verify ownership and authorize this device.
+          Welcome to the Document Hub. This device is currently <strong>unauthorized</strong> to view the records. Please connect your Google Drive account to verify ownership and authorize this device.
         </p>
 
         {/* Premium Orange Action Button */}
@@ -193,7 +193,7 @@ export default function App() {
         // Write tokens locally inside browser storage to authorize this device forever
         localStorage.setItem('msa_google_tokens', JSON.stringify(parsedTokens));
         setDeviceAuthorized(true);
-        showToast('Assalamu Alaikum. Device authorized successfully!');
+        showToast('Welcome! Device authorized successfully!');
         
         // Instantly wipe tokens query parameter from window location cleanly
         const cleanUrl = window.location.pathname + window.location.hash;
