@@ -24,16 +24,26 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
     { value: '12', name: 'December' },
   ];
 
-  // Year options list (2004 to 2040) in descending order
-  const yearsList = Array.from({ length: 37 }, (_, i) => String(2040 - i));
+  // Year options list (2004 to 2040) with the current year at the absolute front
+  const currentYearVal = new Date().getFullYear();
+  const allYearsDesc = Array.from({ length: 37 }, (_, i) => 2040 - i);
+  const yearsList = [
+    String(currentYearVal),
+    ...allYearsDesc.filter(y => y !== currentYearVal).map(String)
+  ];
 
-  // Financial Year options list (2004 to 2040) in descending order
-  const fyList = Array.from({ length: 37 }, (_, i) => {
+  // Financial Year options list (2004 to 2040) with the current financial year at the absolute front
+  const allFyDesc = Array.from({ length: 37 }, (_, i) => {
     const start = 2040 - i;
     const end = start + 1;
     const shortStart = String(start).slice(-2);
     return { value: String(start), label: `${shortStart} - ${end}` };
   });
+  const currentStartYear = String(currentYearVal);
+  const currentFyItem = allFyDesc.find(item => item.value === currentStartYear);
+  const fyList = currentFyItem 
+    ? [currentFyItem, ...allFyDesc.filter(item => item.value !== currentStartYear)]
+    : allFyDesc;
 
   // Calculate default values based on current time
   const getDefaultState = (file) => {
