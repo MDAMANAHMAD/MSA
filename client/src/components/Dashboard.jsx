@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Settings, Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight, CloudOff, RefreshCw } from 'lucide-react';
 
 export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) {
   const [driveAuthorized, setDriveAuthorized] = useState(false);
   const [driveEmail, setDriveEmail] = useState('');
   const [loadingDrive, setLoadingDrive] = useState(true);
   const [greeting, setGreeting] = useState('Welcome Back');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     // Dynamic secular respected greetings based on hour
@@ -17,11 +19,35 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
     else setGreeting('🌙 Good Night');
   }, []);
 
+  // Listen for standard browser online/offline connectivity events
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      checkDriveStatus(); // Re-verify cloud connection when internet restores!
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [apiUrl]);
+
   const checkDriveStatus = async () => {
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      setLoadingDrive(false);
+      return;
+    }
+
     setLoadingDrive(true);
     try {
       const response = await fetch(`${apiUrl}/api/auth/status`);
       const data = await response.json();
+      setApiError(false); // Reset error status on successful response
       
       if (data.authorized) {
         setDriveAuthorized(true);
@@ -70,6 +96,7 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
       console.error('Error checking Drive status:', error);
       setDriveAuthorized(false);
       setDriveEmail('');
+      setApiError(true); // Flag server connection error
     } finally {
       setLoadingDrive(false);
     }
@@ -117,31 +144,49 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
       <div className="app-content">
         
         {/* Google Drive Auth Status Banner */}
-        {!loadingDrive && (
-          driveAuthorized ? (
-            <div className="status-card success" onClick={onSettingsClick}>
-              <div className="status-card-icon">
-                <Cloud size={20} style={{ color: 'var(--accent-salary)' }} />
-              </div>
-              <div className="status-card-text">
-                <h4>Google Drive Active</h4>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 'bold', wordBreak: 'break-all' }}>
-                  {driveEmail || 'Connected to cloud storage'}
-                </p>
-              </div>
+        {!isOnline || apiError ? (
+          <div className="status-card danger" style={{ cursor: 'default' }}>
+            <div className="status-card-icon">
+              <CloudOff size={20} style={{ color: 'var(--color-danger)' }} />
             </div>
-          ) : (
-            <div className="status-card pending" onClick={onSettingsClick}>
-              <div className="status-card-icon">
-                <AlertTriangle size={20} style={{ color: 'var(--accent-ot)' }} />
-              </div>
-              <div className="status-card-text" style={{ flex: 1 }}>
-                <h4>Setup Google Drive Sync</h4>
-                <p>Link your account to save files online securely.</p>
-              </div>
-              <ChevronRight size={18} />
+            <div className="status-card-text">
+              <h4>Offline Mode</h4>
+              <p>Check your internet or server connection.</p>
             </div>
-          )
+          </div>
+        ) : loadingDrive ? (
+          <div className="status-card pending" style={{ cursor: 'default' }}>
+            <div className="status-card-icon">
+              <RefreshCw className="animate-spin" size={20} style={{ color: 'var(--accent-ot)' }} />
+            </div>
+            <div className="status-card-text">
+              <h4>Checking Cloud Status...</h4>
+              <p>Verifying Google Drive connection...</p>
+            </div>
+          </div>
+        ) : driveAuthorized ? (
+          <div className="status-card success" onClick={onSettingsClick}>
+            <div className="status-card-icon">
+              <Cloud size={20} style={{ color: 'var(--accent-salary)' }} />
+            </div>
+            <div className="status-card-text">
+              <h4>Google Drive Active</h4>
+              <p style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 'bold', wordBreak: 'break-all' }}>
+                {driveEmail || 'Connected to cloud storage'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="status-card pending" onClick={onSettingsClick}>
+            <div className="status-card-icon">
+              <AlertTriangle size={20} style={{ color: 'var(--accent-ot)' }} />
+            </div>
+            <div className="status-card-text" style={{ flex: 1 }}>
+              <h4>Setup Google Drive Sync</h4>
+              <p>Link your account to save files online securely.</p>
+            </div>
+            <ChevronRight size={18} />
+          </div>
         )}
 
         {/* 3 Core Category Folders */}

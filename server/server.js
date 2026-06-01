@@ -329,7 +329,7 @@ app.get('/api/documents', async (req, res) => {
     params.push(`%-${month}-%`);
   }
 
-  sql += ' ORDER BY d1.date ASC, d1.id ASC';
+  sql += ' ORDER BY d1.date DESC, d1.id DESC';
 
   try {
     const documents = await dbAll(sql, params);
