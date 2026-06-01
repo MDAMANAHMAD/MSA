@@ -280,7 +280,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     { value: '12', name: 'December' },
   ];
 
-  const yearsList = Array.from({ length: 41 }, (_, i) => String(2000 + i));
+  const yearsList = Array.from({ length: 37 }, (_, i) => String(2040 - i));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '80px' }}>

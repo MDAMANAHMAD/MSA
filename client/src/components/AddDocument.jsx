@@ -24,12 +24,12 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
     { value: '12', name: 'December' },
   ];
 
-  // Year options list (2004 to 2040)
-  const yearsList = Array.from({ length: 37 }, (_, i) => String(2004 + i));
+  // Year options list (2004 to 2040) in descending order
+  const yearsList = Array.from({ length: 37 }, (_, i) => String(2040 - i));
 
-  // Financial Year options list (2004 to 2040)
+  // Financial Year options list (2004 to 2040) in descending order
   const fyList = Array.from({ length: 37 }, (_, i) => {
-    const start = 2004 + i;
+    const start = 2040 - i;
     const end = start + 1;
     const shortStart = String(start).slice(-2);
     return { value: String(start), label: `${shortStart} - ${end}` };
