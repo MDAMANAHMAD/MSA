@@ -6,7 +6,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [month, setMonth] = useState('');
-  const [year, setYear] = useState(() => String(new Date().getFullYear()));
+  const [year, setYear] = useState('');
 
   // Long-press state management
   const [pressingId, setPressingId] = useState(null);
@@ -280,7 +280,12 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     { value: '12', name: 'December' },
   ];
 
-  const yearsList = Array.from({ length: 37 }, (_, i) => String(2040 - i));
+  const currentYearVal = new Date().getFullYear();
+  const allYearsDesc = Array.from({ length: 37 }, (_, i) => 2040 - i);
+  const yearsList = [
+    String(currentYearVal),
+    ...allYearsDesc.filter(y => y !== currentYearVal).map(String)
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '80px' }}>
