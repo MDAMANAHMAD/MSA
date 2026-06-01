@@ -13,15 +13,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
   const pressTimerRef = useRef(null);
   const touchMovedRef = useRef(false);
 
-  // Focus trick refs to scroll native select pickers automatically to current year
-  const yearHasChangedRef = useRef(false);
-  const tempYearSetRef = useRef(false);
-  const preventFetchRef = useRef(false);
-
   const fetchDocuments = async () => {
-    if (preventFetchRef.current) {
-      return; // Skip temporary focus pings to keep All Years documents shown
-    }
     setLoading(true);
     try {
       let query = `?category=${category}`;
@@ -45,35 +37,11 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
     fetchDocuments();
   }, [category, month, year, apiUrl]);
 
+  // When focusing the year filter, if it is currently "All Years" (empty string),
+  // instantly pre-select the current year so the mobile picker opens scrolled directly to it!
   const handleYearFocus = () => {
     if (year === '') {
-      preventFetchRef.current = true;
-      yearHasChangedRef.current = false;
-      tempYearSetRef.current = true;
       setYear(String(new Date().getFullYear()));
-    }
-  };
-
-  const handleYearChange = (e) => {
-    const newVal = e.target.value;
-    preventFetchRef.current = false;
-    yearHasChangedRef.current = true;
-    tempYearSetRef.current = false;
-    
-    if (newVal === year) {
-      fetchDocuments(); // Manual trigger since React state won't change
-    } else {
-      setYear(newVal);
-    }
-  };
-
-  const handleYearBlur = () => {
-    if (tempYearSetRef.current && !yearHasChangedRef.current) {
-      preventFetchRef.current = false;
-      setYear('');
-      tempYearSetRef.current = false;
-    } else {
-      preventFetchRef.current = false;
     }
   };
 
@@ -350,8 +318,7 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
             className="select-control"
             value={year}
             onFocus={handleYearFocus}
-            onChange={handleYearChange}
-            onBlur={handleYearBlur}
+            onChange={(e) => setYear(e.target.value)}
           >
             <option value="">All Years</option>
             {yearsList.map(y => (
