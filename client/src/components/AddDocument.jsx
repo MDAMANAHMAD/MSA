@@ -58,6 +58,15 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
     };
   };
 
+  const formatDateToDDMMYYYY = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   // Helper to calculate OT range preview for a specific date
   const getOtRangePreview = (dateStr) => {
     try {
@@ -68,8 +77,8 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
 
       const formatDateReadable = (d) => {
         const day = String(d.getDate()).padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}-${month}-${d.getFullYear()}`;
       };
 
       return `${formatDateReadable(startDate)} to ${formatDateReadable(endDate)} (14 Days)`;
@@ -479,14 +488,39 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                       {category === 'ot' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                           <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Document Date</label>
-                          <div style={{ position: 'relative' }}>
+                          <div style={{ position: 'relative', width: '100%' }}>
+                            <div
+                              className="input-control"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                paddingLeft: '36px',
+                                paddingRight: '10px',
+                                paddingTop: '8px',
+                                paddingBottom: '8px',
+                                fontSize: '0.82rem',
+                                minHeight: 'auto',
+                                cursor: 'pointer',
+                                pointerEvents: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              {formatDateToDDMMYYYY(item.otDate)}
+                            </div>
                             <input
                               type="date"
-                              className="input-control"
                               value={item.otDate}
                               onChange={(e) => updateQueueItem(item.id, { otDate: e.target.value })}
                               required
-                              style={{ paddingLeft: '36px', paddingRight: '10px', paddingTop: '8px', paddingBottom: '8px', fontSize: '0.82rem', minHeight: 'auto' }}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }}
                               disabled={loading || item.status === 'completed'}
                             />
                             <Calendar
@@ -495,7 +529,8 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                                 position: 'absolute',
                                 left: '10px',
                                 top: '10px',
-                                color: 'var(--text-muted)'
+                                color: 'var(--text-muted)',
+                                pointerEvents: 'none'
                               }}
                             />
                           </div>

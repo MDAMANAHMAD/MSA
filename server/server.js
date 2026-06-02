@@ -316,24 +316,67 @@ app.get('/api/documents', async (req, res) => {
     params.push(category);
   }
 
-  if (month && year) {
-    // Match date starting with YYYY-MM
-    sql += " AND d1.date LIKE ?";
-    params.push(`${year}-${month}%`);
-  } else if (year) {
-    // Match date starting with YYYY
-    sql += " AND d1.date LIKE ?";
-    params.push(`${year}%`);
-  } else if (month) {
-    // Match date containing -MM-
-    sql += " AND d1.date LIKE ?";
-    params.push(`%-${month}-%`);
-  }
-
   sql += ' ORDER BY d1.date DESC, d1.id DESC';
 
   try {
-    const documents = await dbAll(sql, params);
+    let documents = await dbAll(sql, params);
+
+    // Apply smart cross-month range intersection logic in JS for SQLite/Postgres consistency
+    if (month || year) {
+      documents = documents.filter(doc => {
+        if (!doc.date) return false;
+
+        // Parse YYYY-MM-DD components
+        const parts = doc.date.split('-');
+        if (parts.length !== 3) return false;
+
+        const docYr = parseInt(parts[0], 10);
+        const docMth = parseInt(parts[1], 10);
+        const docDay = parseInt(parts[2], 10);
+
+        const endD = new Date(docYr, docMth - 1, docDay);
+        const startD = new Date(endD);
+        if (doc.category === 'ot') {
+          // Overtime (OT) cycles represent 14 days ending on doc.date
+          startD.setDate(endD.getDate() - 13);
+        }
+
+        const startYr = startD.getFullYear();
+        const startMth = startD.getMonth() + 1;
+
+        // Case 1: Both month and year filters are active
+        if (month && year) {
+          const filterYr = parseInt(year, 10);
+          const filterMth = parseInt(month, 10);
+
+          const filterStartD = new Date(filterYr, filterMth - 1, 1);
+          const filterEndD = new Date(filterYr, filterMth, 0); // Last day of month
+
+          return startD <= filterEndD && endD >= filterStartD;
+        }
+
+        // Case 2: Only year filter is active
+        if (year) {
+          const filterYr = parseInt(year, 10);
+
+          const filterStartD = new Date(filterYr, 0, 1);
+          const filterEndD = new Date(filterYr, 11, 31);
+
+          return startD <= filterEndD && endD >= filterStartD;
+        }
+
+        // Case 3: Only month filter is active (across any year)
+        if (month) {
+          const filterMth = parseInt(month, 10);
+
+          // Cycle can span at most 2 calendar months, check if start month or end month matches
+          return startMth === filterMth || docMth === filterMth;
+        }
+
+        return true;
+      });
+    }
+
     res.json(documents);
   } catch (error) {
     res.status(500).json({ error: error.message });
