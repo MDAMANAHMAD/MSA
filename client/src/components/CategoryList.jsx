@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, FileText, Cloud, CloudOff, RefreshCw, Trash2, HelpCircle, Share2 } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Cloud, CloudOff, RefreshCw, Trash2, HelpCircle, Share2, Calendar, X } from 'lucide-react';
 
 export default function CategoryList({ category, apiUrl, onBack, onAddClick, showToast }) {
   const [documents, setDocuments] = useState([]);
@@ -12,6 +12,14 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
   const [pressingId, setPressingId] = useState(null);
   const pressTimerRef = useRef(null);
   const touchMovedRef = useRef(false);
+
+  // Edit Date State Management
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [editDateValue, setEditDateValue] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editMonth, setEditMonth] = useState('01');
+  const [editYear, setEditYear] = useState('2026');
+  const [editFyStart, setEditFyStart] = useState('2026');
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -66,6 +74,90 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
       return `${day}-${month}-${year}`;
     } catch (e) {
       return dateStr;
+    }
+  };
+
+  const formatDateToDDMMYYYY_NoTZ = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const getOtRangePreview = (dateStr) => {
+    try {
+      const endDate = new Date(dateStr);
+      if (isNaN(endDate.getTime())) return '';
+      const startDate = new Date(endDate);
+      startDate.setDate(endDate.getDate() - 13);
+
+      const formatDateReadable = (d) => {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}-${month}-${d.getFullYear()}`;
+      };
+
+      return `${formatDateReadable(startDate)} to ${formatDateReadable(endDate)} (14 Days)`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const handleEditDateClick = (e, doc) => {
+    e.stopPropagation();
+    setEditingDoc(doc);
+    setEditDateValue(doc.date);
+    
+    const parts = doc.date.split('-');
+    if (parts.length === 3) {
+      setEditYear(parts[0]);
+      setEditMonth(parts[1]);
+      
+      const docYr = parseInt(parts[0], 10);
+      const docMth = parseInt(parts[1], 10);
+      const fyStart = docMth >= 4 ? docYr : docYr - 1;
+      setEditFyStart(String(fyStart));
+    }
+  };
+
+  const handleSaveDate = async () => {
+    if (!editingDoc) return;
+    
+    let newDate = editDateValue;
+    if (category === 'salary_slip' || category === 'mileage') {
+      newDate = `${editYear}-${editMonth}-01`;
+    } else if (category === 'itr') {
+      newDate = `${editFyStart}-04-01`;
+    }
+    
+    setSavingEdit(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/documents/${editingDoc.id}/date`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: newDate })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update date.');
+      
+      setDocuments(prev =>
+        prev.map(d => d.id === editingDoc.id ? { 
+          ...d, 
+          date: data.document.date, 
+          file_name: data.document.file_name,
+          file_path: data.document.file_path
+        } : d)
+      );
+      
+      showToast('✓ Date updated successfully!');
+      setEditingDoc(null);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Error updating date.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -327,6 +419,20 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
           </select>
         </div>
 
+        {/* Total PDF count display */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0 4px',
+          marginBottom: '12px',
+          fontSize: '0.85rem',
+          fontWeight: '700',
+          color: 'var(--text-muted)'
+        }}>
+          <span>Total PDFs: {documents.length}</span>
+        </div>
+
         {/* Info label for Long Press */}
         {category === 'ot' && documents.length > 0 && (
           <div className="long-press-hint">
@@ -437,6 +543,14 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
                       <Share2 size={18} />
                     </button>
                     <button
+                      className="action-btn"
+                      onClick={(e) => handleEditDateClick(e, doc)}
+                      title="Change date/period"
+                      style={{ color: 'var(--accent-ot)' }}
+                    >
+                      <Calendar size={18} />
+                    </button>
+                    <button
                       className="action-btn delete"
                       onClick={(e) => handleDeleteDoc(e, doc)}
                       title="Delete from device"
@@ -454,6 +568,158 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
       <button className="fab" onClick={onAddClick}>
         <Plus size={28} />
       </button>
+
+      {/* Date Edit Modal */}
+      {editingDoc && (
+        <div className="modal-overlay" onClick={() => setEditingDoc(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-dark)' }}>
+                <Calendar size={22} style={{ color: 'var(--accent-ot)' }} />
+                <span>Update Document Date</span>
+              </h3>
+              <button className="modal-close" onClick={() => setEditingDoc(null)} title="Close Modal">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '600', wordBreak: 'break-all' }}>
+                Editing: {editingDoc.file_name}
+              </div>
+              
+              {/* Form Selectors depending on category */}
+              
+              {(category === 'salary_slip' || category === 'mileage') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-dark)' }}>Select Period (Month & Year)</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select
+                      className="select-control"
+                      value={editMonth}
+                      onChange={(e) => setEditMonth(e.target.value)}
+                      style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem' }}
+                    >
+                      {monthsList.map(m => (
+                        <option key={m.value} value={m.value}>{m.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      className="select-control"
+                      value={editYear}
+                      onChange={(e) => setEditYear(e.target.value)}
+                      style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem' }}
+                    >
+                      {yearsList.filter(y => y !== '').map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {category === 'itr' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-dark)' }}>Financial Year Range</label>
+                  <select
+                    className="select-control"
+                    value={editFyStart}
+                    onChange={(e) => setEditFyStart(e.target.value)}
+                    style={{ padding: '8px 10px', fontSize: '0.82rem' }}
+                  >
+                    {Array.from({ length: 37 }, (_, i) => {
+                      const start = 2004 + i;
+                      const end = start + 1;
+                      const shortStart = String(start).slice(-2);
+                      return { value: String(start), label: `${shortStart} - ${end}` };
+                    }).map(fy => (
+                      <option key={fy.value} value={fy.value}>{fy.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {category === 'ot' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-dark)' }}>Document Date</label>
+                  <div style={{ position: 'relative', width: '100%', height: '52px' }}>
+                    <div
+                      className="input-control"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        paddingLeft: '36px',
+                        paddingRight: '10px',
+                        fontSize: '0.82rem',
+                        height: '52px',
+                        cursor: 'pointer',
+                        pointerEvents: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {formatDateToDDMMYYYY_NoTZ(editDateValue)}
+                    </div>
+                    <input
+                      type="date"
+                      value={editDateValue}
+                      onChange={(e) => setEditDateValue(e.target.value)}
+                      required
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '52px',
+                        opacity: 0,
+                        cursor: 'pointer',
+                        zIndex: 2
+                      }}
+                    />
+                    <Calendar
+                      size={16}
+                      style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '18px',
+                        color: 'var(--text-muted)',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-ot)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--accent-ot-light)', padding: '6px 10px', borderRadius: '8px' }}>
+                    <Calendar size={12} style={{ flexShrink: 0 }} />
+                    <span>Cycle: {getOtRangePreview(editDateValue)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-large"
+                  onClick={handleSaveDate}
+                  disabled={savingEdit}
+                  style={{ flex: 1, background: 'linear-gradient(135deg, #E67E22, #D35400)' }}
+                >
+                  {savingEdit ? 'Saving...' : 'Save Date'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-large"
+                  onClick={() => setEditingDoc(null)}
+                  disabled={savingEdit}
+                  style={{ flex: 1, background: '#E8E6E2', color: 'var(--text-dark)', boxShadow: 'none' }}
+                >
+                  Cancel
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

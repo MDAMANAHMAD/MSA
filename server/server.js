@@ -626,6 +626,137 @@ app.post('/api/documents/:id/sync', async (req, res) => {
   }
 });
 
+// Update document date and rename corresponding files locally and on Google Drive
+app.put('/api/documents/:id/date', async (req, res) => {
+  const docId = req.params.id;
+  const { date } = req.body;
+
+  if (!date) {
+    return res.status(400).json({ error: 'Date parameter is required.' });
+  }
+
+  try {
+    const doc = await dbGet('SELECT * FROM documents WHERE id = ?', [docId]);
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found.' });
+    }
+
+    const oldFilePath = doc.file_path;
+
+    // Calculate new friendly filename using same logic as upload
+    const formattedDate = date.replace(/-/g, '_');
+    let friendlyName = `${date}_${doc.category}.pdf`;
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June", 
+      "July", "August", "September", "October", "November", "December"
+    ];
+    let monthYearStr = formattedDate;
+    try {
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        monthYearStr = `${monthNames[d.getMonth()]}_${d.getFullYear()}`;
+      }
+    } catch (e) {
+      console.error('Date parsing failed:', e);
+    }
+    
+    if (doc.category === 'salary_slip') {
+      friendlyName = `${monthYearStr}_Salary_Slip_${doc.amount || 0}.pdf`;
+    } else if (doc.category === 'mileage') {
+      friendlyName = `${monthYearStr}_Mileage_${doc.miles || 0}miles.pdf`;
+    } else if (doc.category === 'ot') {
+      try {
+        const endDate = new Date(date);
+        if (!isNaN(endDate.getTime())) {
+          const startDate = new Date(endDate);
+          startDate.setDate(endDate.getDate() - 13);
+          
+          const monthsShort = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+          ];
+          
+          const formatReadable = (d) => {
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = monthsShort[d.getMonth()];
+            return `${day}_${month}`;
+          };
+          
+          const startStr = formatReadable(startDate);
+          const endStr = formatReadable(endDate);
+          const year = endDate.getFullYear();
+          
+          friendlyName = `${startStr}_to_${endStr}_${year}_OT_${doc.hours || 0}hrs.pdf`;
+        }
+      } catch (dateErr) {
+        console.error('Failed to calculate 15-day range, using fallback:', dateErr.message);
+        friendlyName = `${date}_OT_${doc.hours || 0}hrs.pdf`;
+      }
+    } else if (doc.category === 'itr') {
+      try {
+        const d = new Date(date);
+        if (!isNaN(d.getTime())) {
+          const startingYear = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+          const endingYear = startingYear + 1;
+          const shortStart = String(startingYear).slice(-2);
+          friendlyName = `${shortStart}-${endingYear}_ITR_Projection.pdf`;
+        }
+      } catch (dateErr) {
+        console.error('Failed to calculate ITR financial year, using fallback:', dateErr.message);
+        friendlyName = `${date}_ITR_Projection.pdf`;
+      }
+    }
+
+    const newFilePath = path.join(path.dirname(oldFilePath), friendlyName);
+
+    // 1. Rename the local file if it exists
+    if (fs.existsSync(oldFilePath)) {
+      try {
+        fs.renameSync(oldFilePath, newFilePath);
+      } catch (err) {
+        console.error(`Local file rename failed from ${oldFilePath} to ${newFilePath}:`, err.message);
+      }
+    }
+
+    // 2. Rename on Google Drive if synced
+    if (doc.google_drive_id) {
+      try {
+        const isDriveAuthorized = await googleDriveService.isAuthorized();
+        if (isDriveAuthorized) {
+          await googleDriveService.renameOnDrive(doc.google_drive_id, friendlyName);
+        }
+      } catch (driveErr) {
+        console.error('Google Drive rename failed:', driveErr.message);
+      }
+    }
+
+    // 3. Update database
+    const relativeNewPath = oldFilePath.startsWith('uploads/') || oldFilePath.startsWith('uploads\\')
+      ? `uploads/${friendlyName}`
+      : newFilePath;
+      
+    await dbRun(
+      'UPDATE documents SET date = ?, file_name = ?, file_path = ? WHERE id = ?',
+      [date, friendlyName, relativeNewPath, docId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Document date and file name updated successfully!',
+      document: {
+        id: docId,
+        date,
+        file_name: friendlyName,
+        file_path: relativeNewPath
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Toggle receipt status of a document
 app.put('/api/documents/:id/received', async (req, res) => {
   const docId = req.params.id;

@@ -374,6 +374,20 @@ async function deleteFromDrive(fileId) {
   console.log(`Successfully deleted file from Google Drive with ID ${fileId}`);
 }
 
+// Rename a file on Google Drive
+async function renameOnDrive(fileId, newName) {
+  const auth = await getAuthenticatedClient();
+  const drive = google.drive({ version: 'v3', auth });
+  
+  await drive.files.update({
+    fileId: fileId,
+    requestBody: {
+      name: newName
+    }
+  });
+  console.log(`Successfully renamed file on Google Drive to "${newName}"`);
+}
+
 module.exports = {
   isAuthorized,
   getAuthUrl,
@@ -382,5 +396,6 @@ module.exports = {
   getConnectedUserEmail,
   fetchAndSyncAllFilesFromDrive,
   downloadFileStreamFromDrive,
-  deleteFromDrive
+  deleteFromDrive,
+  renameOnDrive
 };
