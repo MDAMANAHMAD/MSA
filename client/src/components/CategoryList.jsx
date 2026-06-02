@@ -125,6 +125,10 @@ export default function CategoryList({ category, apiUrl, onBack, onAddClick, sho
   const handleSaveDate = async () => {
     if (!editingDoc) return;
     
+    if (!window.confirm('Are you sure you want to update the date of this document? This will rename the file locally and on Google Drive.')) {
+      return;
+    }
+    
     let newDate = editDateValue;
     if (category === 'salary_slip' || category === 'mileage') {
       newDate = `${editYear}-${editMonth}-01`;
