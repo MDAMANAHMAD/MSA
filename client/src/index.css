@@ -813,3 +813,35 @@ body {
     background-position: 200% center;
   }
 }
+
+/* Responsive document card enhancements for mobile screens to prevent overflow */
+@media (max-width: 480px) {
+  .document-card {
+    padding: 12px;
+  }
+  .document-card-left {
+    gap: 8px;
+    min-width: 0;
+  }
+  .document-meta {
+    min-width: 0;
+  }
+  .document-meta h4 {
+    font-size: 0.9rem;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .document-actions {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .action-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .pdf-icon-wrapper {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+}
