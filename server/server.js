@@ -163,7 +163,19 @@ app.get('/api/auth/url', (req, res) => {
   }
 });
 
-// Export current Google Drive OAuth tokens has been deprecated and disabled for device-level security.
+// Export current Google Drive OAuth tokens for browser localStorage backup
+app.get('/api/auth/export', async (req, res) => {
+  try {
+    const row = await dbGet("SELECT value FROM settings WHERE key = 'google_tokens'");
+    if (row) {
+      res.json({ tokens: JSON.parse(row.value) });
+    } else {
+      res.status(404).json({ error: 'No tokens found.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Import Google Drive OAuth tokens from browser localStorage backup to self-heal connection
 app.post('/api/auth/import', async (req, res) => {

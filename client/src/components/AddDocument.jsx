@@ -488,7 +488,7 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                       {category === 'ot' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                           <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Document Date</label>
-                          <div style={{ position: 'relative', width: '100%' }}>
+                          <div style={{ position: 'relative', width: '100%', height: '52px' }}>
                             <div
                               className="input-control"
                               style={{
@@ -496,10 +496,8 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                                 alignItems: 'center',
                                 paddingLeft: '36px',
                                 paddingRight: '10px',
-                                paddingTop: '8px',
-                                paddingBottom: '8px',
                                 fontSize: '0.82rem',
-                                minHeight: 'auto',
+                                height: '52px',
                                 cursor: 'pointer',
                                 pointerEvents: 'none',
                                 boxSizing: 'border-box'
@@ -517,9 +515,10 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                                 top: 0,
                                 left: 0,
                                 width: '100%',
-                                height: '100%',
+                                height: '52px',
                                 opacity: 0,
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                zIndex: 2
                               }}
                               disabled={loading || item.status === 'completed'}
                             />
@@ -528,9 +527,10 @@ export default function AddDocument({ category, apiUrl, onBack, onSaveSuccess })
                               style={{
                                 position: 'absolute',
                                 left: '10px',
-                                top: '10px',
+                                top: '18px', // Centered vertically in 52px height
                                 color: 'var(--text-muted)',
-                                pointerEvents: 'none'
+                                pointerEvents: 'none',
+                                zIndex: 1
                               }}
                             />
                           </div>
