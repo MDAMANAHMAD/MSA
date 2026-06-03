@@ -845,3 +845,24 @@ body {
     flex-shrink: 0;
   }
 }
+
+/* App Lock Screen Pulse Ring Animation */
+@keyframes lock-pulse {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(44, 62, 80, 0.15);
+  }
+  70% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 12px rgba(44, 62, 80, 0);
+  }
+  100% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(44, 62, 80, 0);
+  }
+}
+
+.lock-sphere {
+  animation: lock-pulse 2s infinite ease-in-out;
+}
+
