@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import CategoryList from './components/CategoryList';
 import AddDocument from './components/AddDocument';
 import SettingsModal from './components/SettingsModal';
 
-import { Info, Lock, Fingerprint, Loader2 } from 'lucide-react';
-import { verifyDeviceCredential } from './utils/webauthn';
+import { Info, Lock } from 'lucide-react';
 
 export default function App() {
   // Navigation states: 'dashboard', 'list', 'add'
@@ -13,76 +12,57 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('salary_slip');
   const [showSettings, setShowSettings] = useState(false);
 
-  // App Lock security states
-  const [isLocked, setIsLocked] = useState(() => {
-    return localStorage.getItem('msa_lock_enabled') === 'true';
-  });
-  const [authError, setAuthError] = useState('');
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  // App Lock security states (fixed passcode lock '2004')
+  const [isLocked, setIsLocked] = useState(true);
+  const [passcode, setPasscode] = useState('');
+  const [isShaking, setIsShaking] = useState(false);
 
-  const handleUnlock = useCallback(async () => {
-    const isLockEnabled = localStorage.getItem('msa_lock_enabled') === 'true';
-    if (!isLockEnabled) {
-      setIsLocked(false);
-      return;
-    }
+  const handleDigitClick = (digit) => {
+    if (passcode.length >= 4 || isShaking) return;
     
-    const credentialId = localStorage.getItem('msa_lock_credential_id');
-    if (!credentialId) {
-      localStorage.removeItem('msa_lock_enabled');
-      setIsLocked(false);
-      return;
-    }
+    const newPasscode = passcode + digit;
+    setPasscode(newPasscode);
 
-    setIsAuthenticating(true);
-    setAuthError('');
-    try {
-      const success = await verifyDeviceCredential(credentialId);
-      if (success) {
-        setIsLocked(false);
+    if (newPasscode.length === 4) {
+      if (newPasscode === '2004') {
+        // Unlock app
+        setTimeout(() => {
+          setIsLocked(false);
+          setPasscode('');
+        }, 150);
       } else {
-        setAuthError('Authentication failed.');
+        // Wrong passcode: trigger shake feedback
+        setTimeout(() => {
+          setIsShaking(true);
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+          setTimeout(() => {
+            setIsShaking(false);
+            setPasscode('');
+          }, 400);
+        }, 150);
       }
-    } catch (err) {
-      console.error('Unlock error:', err);
-      setAuthError(err.message || 'Verification cancelled.');
-    } finally {
-      setIsAuthenticating(false);
     }
-  }, []);
+  };
 
-  // Trigger unlock prompt automatically on mount if app is locked
-  useEffect(() => {
-    if (isLocked) {
-      const timer = setTimeout(() => {
-        handleUnlock();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLocked, handleUnlock]);
+  const handleBackspace = () => {
+    if (isShaking) return;
+    setPasscode(prev => prev.slice(0, -1));
+  };
 
-  // Handle auto-locking on returning from background
+  // Lock the app whenever returning from background/screen lock
   useEffect(() => {
     const handleVisibilityChange = () => {
-      const isLockEnabled = localStorage.getItem('msa_lock_enabled') === 'true';
-      if (!isLockEnabled) return;
-
       if (document.visibilityState === 'visible') {
-        setIsLocked(prev => {
-          if (!prev) {
-            setTimeout(() => {
-              handleUnlock();
-            }, 300);
-            return true;
-          }
-          return prev;
-        });
+        setIsLocked(true);
+        setPasscode('');
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [handleUnlock]);
+  }, []);
 
   // Settings base API Url state
   const [apiUrl, setApiUrl] = useState(() => {
@@ -236,114 +216,59 @@ export default function App() {
 
       {/* App Lock Screen Overlay */}
       {isLocked && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(250, 248, 245, 0.75)', // Glass effect matching bg-cream
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px',
-          textAlign: 'center',
-          fontFamily: 'var(--font-main)'
-        }}>
-          {/* Glowing lock sphere */}
-          <div className="lock-sphere" style={{
-            position: 'relative',
-            width: '100px',
-            height: '100px',
+        <div className="lockscreen-overlay">
+          {/* Pulsating Lock Sphere */}
+          <div style={{
+            width: '80px',
+            height: '80px',
             borderRadius: '50%',
             background: 'rgba(44, 62, 80, 0.05)',
             border: '1.5px solid rgba(44, 62, 80, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: '28px',
+            marginBottom: '16px',
             boxShadow: '0 8px 32px rgba(44, 62, 80, 0.05)'
           }}>
-            <Lock size={40} style={{ color: 'var(--text-dark)' }} />
+            <Lock size={32} style={{ color: 'var(--text-dark)' }} />
           </div>
 
-          <h2 style={{
-            color: 'var(--text-dark)',
-            fontWeight: '700',
-            fontSize: '1.6rem',
-            marginBottom: '10px',
-            letterSpacing: '-0.5px'
-          }}>
-            Application Locked
-          </h2>
-          
-          <p style={{
-            color: 'var(--text-muted)',
-            fontSize: '0.95rem',
-            lineHeight: '1.5',
-            maxWidth: '280px',
-            marginBottom: '36px',
-            fontWeight: '500'
-          }}>
-            Authenticate using your phone's screen lock to access your documents.
-          </p>
+          <h2 className="lockscreen-title">Enter Passcode</h2>
+          <p className="lockscreen-subtitle">Your Document Hub is locked</p>
 
-          <button
-            onClick={handleUnlock}
-            disabled={isAuthenticating}
-            style={{
-              background: 'linear-gradient(135deg, #2C3E50, #1A252F)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '16px',
-              padding: '16px 28px',
-              fontSize: '1rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(44, 62, 80, 0.2)',
-              transition: 'transform 0.2s ease, opacity 0.2s ease',
-              width: '100%',
-              maxWidth: '280px',
-              justifyContent: 'center'
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.96)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            {isAuthenticating ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                <span>Verifying...</span>
-              </>
-            ) : (
-              <>
-                <Fingerprint size={20} />
-                <span>Unlock App</span>
-              </>
-            )}
-          </button>
+          {/* Dots Indicator */}
+          <div className={`passcode-dots ${isShaking ? 'shake-anim' : ''}`}>
+            <div className={`passcode-dot ${passcode.length >= 1 ? 'filled' : ''}`} />
+            <div className={`passcode-dot ${passcode.length >= 2 ? 'filled' : ''}`} />
+            <div className={`passcode-dot ${passcode.length >= 3 ? 'filled' : ''}`} />
+            <div className={`passcode-dot ${passcode.length >= 4 ? 'filled' : ''}`} />
+          </div>
 
-          {authError && (
-            <p style={{
-              color: 'var(--color-danger)',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              marginTop: '20px',
-              background: 'var(--color-danger-light)',
-              padding: '8px 16px',
-              borderRadius: '10px',
-              border: '1px solid rgba(231, 76, 60, 0.15)',
-              maxWidth: '280px'
-            }}>
-              {authError}
-            </p>
-          )}
+          {/* Custom Phone Numeric Keypad Grid */}
+          <div className="keypad-grid">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+              <button 
+                key={num} 
+                className="keypad-btn" 
+                onClick={() => handleDigitClick(num.toString())}
+              >
+                {num}
+              </button>
+            ))}
+            <div className="keypad-btn empty" />
+            <button 
+              className="keypad-btn" 
+              onClick={() => handleDigitClick('0')}
+            >
+              0
+            </button>
+            <button 
+              className="keypad-btn action" 
+              onClick={handleBackspace}
+            >
+              Delete
+            </button>
+          </div>
         </div>
       )}
     </>

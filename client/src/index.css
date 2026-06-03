@@ -846,23 +846,131 @@ body {
   }
 }
 
-/* App Lock Screen Pulse Ring Animation */
-@keyframes lock-pulse {
-  0% {
-    transform: scale(0.96);
-    box-shadow: 0 0 0 0 rgba(44, 62, 80, 0.15);
-  }
-  70% {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 12px rgba(44, 62, 80, 0);
-  }
-  100% {
-    transform: scale(0.96);
-    box-shadow: 0 0 0 0 rgba(44, 62, 80, 0);
-  }
+/* App Passcode Lock Screen Overlay */
+.lockscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(250, 248, 245, 0.85); /* Frost cream glass background */
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  zIndex: 99999; /* Highest priority overlay */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 24px;
+  font-family: var(--font-main);
+  touch-action: none; /* Block scrolling background */
 }
 
-.lock-sphere {
-  animation: lock-pulse 2s infinite ease-in-out;
+.lockscreen-title {
+  color: var(--text-dark);
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: -0.5px;
+  margin-top: 10px;
+  margin-bottom: 6px;
 }
+
+.lockscreen-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 40px;
+}
+
+/* Dots container */
+.passcode-dots {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 50px;
+  justify-content: center;
+}
+
+.passcode-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text-dark);
+  background: transparent;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.passcode-dot.filled {
+  background: var(--text-dark);
+  transform: scale(1.15);
+}
+
+/* Shake animation for wrong passcode */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
+.shake-anim {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* Custom phone-style numeric keypad grid */
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px 28px;
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 20px;
+}
+
+.keypad-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(44, 62, 80, 0.1);
+  background: white;
+  color: var(--text-dark);
+  font-size: 1.7rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(44, 62, 80, 0.03);
+  transition: transform 0.1s ease, background 0.1s ease, border-color 0.1s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.keypad-btn:active {
+  background: #E8E6E2;
+  border-color: transparent;
+  transform: scale(0.92);
+}
+
+.keypad-btn.empty {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+}
+
+.keypad-btn.action {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.keypad-btn.action:active {
+  background: transparent;
+  color: var(--text-dark);
+  transform: scale(0.92);
+}
+
 
