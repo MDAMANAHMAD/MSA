@@ -8,15 +8,28 @@ export default function SettingsModal({ apiUrl, onClose }) {
   const [loading, setLoading] = useState(true);
 
   // Device Lock Screen settings state
-  const [lockSupported, setLockSupported] = useState(false);
+  const [lockStatus, setLockStatus] = useState('checking'); // 'checking', 'supported', 'unsupported_browser', 'no_platform_authenticator'
   const [lockEnabled, setLockEnabled] = useState(false);
   const [lockLoading, setLockLoading] = useState(false);
 
   useEffect(() => {
     const initLock = async () => {
-      const supported = await isPlatformAuthenticatorAvailable();
-      setLockSupported(supported);
       setLockEnabled(localStorage.getItem('msa_lock_enabled') === 'true');
+      if (!window.PublicKeyCredential) {
+        setLockStatus('unsupported_browser');
+        return;
+      }
+      try {
+        const platformAvailable = await PublicKeyCredential.isUserVerificationPlatformAuthenticatorAvailable();
+        if (platformAvailable) {
+          setLockStatus('supported');
+        } else {
+          setLockStatus('no_platform_authenticator');
+        }
+      } catch (error) {
+        console.error('Error checking platform authenticator availability:', error);
+        setLockStatus('no_platform_authenticator');
+      }
     };
     initLock();
   }, []);
@@ -210,7 +223,13 @@ export default function SettingsModal({ apiUrl, onClose }) {
                     Require your phone's native lock screen (PIN, fingerprint, Face ID, pattern) to open the app.
                   </p>
                   
-                  {!lockSupported ? (
+                  {lockStatus === 'checking' && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                      Checking device support...
+                    </div>
+                  )}
+
+                  {lockStatus === 'unsupported_browser' && (
                     <div style={{ 
                       marginTop: '8px',
                       background: 'var(--accent-ot-light)',
@@ -225,12 +244,38 @@ export default function SettingsModal({ apiUrl, onClose }) {
                       gap: '6px'
                     }}>
                       <AlertTriangle size={14} />
-                      <span>WebAuthn unavailable or requires HTTPS/localhost.</span>
+                      <span>WebAuthn requires HTTPS connection.</span>
                     </div>
-                  ) : (
+                  )}
+
+                  {lockStatus === 'no_platform_authenticator' && (
+                    <div style={{ 
+                      marginTop: '8px',
+                      background: 'var(--accent-ot-light)',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1.5px solid rgba(243, 156, 18, 0.25)',
+                      fontSize: '0.8rem',
+                      color: 'var(--accent-ot)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      lineHeight: '1.3'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                        <AlertTriangle size={14} />
+                        <span>Lock Not Configured on this Device</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                        To enable this, your current device must have a native screen lock (Windows Hello, PIN, fingerprint, Face ID, pattern) set up. Try opening this page on your phone!
+                      </span>
+                    </div>
+                  )}
+
+                  {lockStatus === 'supported' && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', width: '100%' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: lockEnabled ? 'var(--accent-salary)' : 'var(--text-muted)' }}>
-                        {lockEnabled ? 'Lock Active' : 'Lock Disabled'}
+                        {lockEnabled ? 'Lock Active' : 'Lock Enabled'}
                       </span>
                       <button
                         onClick={handleToggleLock}
