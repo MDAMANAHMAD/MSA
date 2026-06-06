@@ -20,6 +20,16 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   console.log(`Created local upload directory at: ${UPLOAD_DIR}`);
 }
 
+// Activity logging helper
+async function logActivity(eventType, details) {
+  try {
+    await dbRun('INSERT INTO activity_logs (event_type, details) VALUES (?, ?)', [eventType, details]);
+    console.log(`[ACTIVITY LOG] ${eventType}: ${details}`);
+  } catch (err) {
+    console.error('Failed to write activity log:', err.message);
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -192,6 +202,7 @@ app.post('/api/auth/import', async (req, res) => {
     // Asynchronously sweep and sync files immediately from Drive
     googleDriveService.fetchAndSyncAllFilesFromDrive().catch(err => console.error('Import sweep error:', err.message));
     
+    await logActivity('settings_update', 'Google Drive OAuth tokens imported (Connection self-healed)');
     res.json({ success: true, message: 'OAuth tokens imported and connection self-healed!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -207,6 +218,7 @@ app.get('/api/auth/callback', async (req, res) => {
 
   try {
     const tokens = await googleDriveService.saveTokensFromCode(code);
+    await logActivity('settings_update', 'Google Drive connection authorized successfully via OAuth');
     
     // Safely trigger background sweep immediately after successful connection
     syncAllUnsyncedDocuments().catch(err => console.error('Callback auto-sync error:', err.message));
@@ -513,6 +525,7 @@ app.post('/api/documents/upload', upload.single('pdf'), async (req, res) => {
       console.log('Google Drive is not linked yet. File saved locally only.');
     }
 
+    await logActivity('document_upload', `Uploaded ${category} document "${friendlyName}" (ID: ${docId})`);
     res.status(201).json({
       success: true,
       message: driveUploadSuccess 
@@ -740,6 +753,7 @@ app.put('/api/documents/:id/date', async (req, res) => {
       'UPDATE documents SET date = ?, file_name = ?, file_path = ? WHERE id = ?',
       [date, friendlyName, relativeNewPath, docId]
     );
+    await logActivity('document_date_update', `Updated date of document ID ${docId} from "${doc.date}" to "${date}" (New name: "${friendlyName}")`);
 
     res.json({
       success: true,
@@ -777,6 +791,7 @@ app.put('/api/documents/:id/received', async (req, res) => {
       docId
     ]);
 
+    await logActivity('document_received_toggle', `Marked document "${doc.file_name}" (ID: ${docId}) as ${is_received ? 'Received' : 'Pending'}`);
     res.json({
       success: true,
       message: `Document receipt marked as ${is_received ? 'Received' : 'Pending'}!`,
@@ -817,8 +832,30 @@ app.delete('/api/documents/:id', async (req, res) => {
 
     // 3. Delete database entry
     await dbRun('DELETE FROM documents WHERE id = ?', [docId]);
+    await logActivity('document_delete', `Deleted document "${doc.file_name}" (ID: ${docId}, Category: ${doc.category})`);
 
     res.json({ success: true, message: 'Document deleted successfully from device and Google Drive.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Retrieve activity logs
+app.get('/api/logs', async (req, res) => {
+  try {
+    const logs = await dbAll('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100');
+    res.json({ success: true, logs });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear activity logs
+app.post('/api/logs/clear', async (req, res) => {
+  try {
+    await dbRun('DELETE FROM activity_logs');
+    await logActivity('system', 'Activity audit logs cleared');
+    res.json({ success: true, message: 'Activity logs cleared successfully.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

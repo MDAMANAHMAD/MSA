@@ -64,6 +64,17 @@ function initializeSqliteDatabase() {
         });
       }
     });
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type TEXT NOT NULL,
+        details TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating activity_logs table:', err.message);
+    });
   });
 }
 
@@ -95,6 +106,16 @@ async function initializePostgresDatabase() {
           miles DOUBLE PRECISION DEFAULT 0,
           google_drive_id TEXT,
           is_received INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // 3. Activity Logs Table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS activity_logs (
+          id SERIAL PRIMARY KEY,
+          event_type TEXT NOT NULL,
+          details TEXT NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
