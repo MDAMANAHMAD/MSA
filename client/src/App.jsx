@@ -29,6 +29,24 @@ export default function App() {
         setTimeout(() => {
           setIsLocked(false);
           setPasscode('');
+
+          // Auto-sync/self-heal Google Drive immediately in the background
+          const savedTokens = localStorage.getItem('msa_google_tokens');
+          if (savedTokens) {
+            fetch(`${apiUrl}/api/auth/import`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tokens: JSON.parse(savedTokens) })
+            })
+            .then(res => {
+              if (res.ok) {
+                showToast('Google Drive synced successfully!');
+              }
+            })
+            .catch(err => {
+              console.error('Failed to auto-sync Google Drive on unlock:', err);
+            });
+          }
         }, 150);
       } else {
         // Wrong passcode: trigger shake feedback
