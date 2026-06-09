@@ -34,7 +34,8 @@ function getAuthUrl() {
   return oauth2Client.generateAuthUrl({
     access_type: 'offline', // Required to get refresh token
     scope: ['https://www.googleapis.com/auth/drive.file'],
-    prompt: 'consent' // Forces consent screen to get refresh token every time we authenticate
+    prompt: 'consent', // Forces consent screen to get refresh token every time we authenticate
+    login_hint: 'msa.documenthub@gmail.com' // Pre-selects / restricts selection to the target drive email
   });
 }
 
