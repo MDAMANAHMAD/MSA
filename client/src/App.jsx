@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './components/Dashboard';
 import CategoryList from './components/CategoryList';
 import AddDocument from './components/AddDocument';
@@ -17,6 +17,146 @@ export default function App() {
   const [passcode, setPasscode] = useState('');
   const [isShaking, setIsShaking] = useState(false);
 
+  // Settings base API Url state
+  const [apiUrl, setApiUrl] = useState(() => {
+    const saved = localStorage.getItem('msa_api_url');
+    if (saved) return saved;
+    
+    // If running locally in development, default to local server port 5000
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:5000';
+    }
+    // Permanent production fallback to Render backend
+    return 'https://msa-ozae.onrender.com';
+  });
+
+  // Global Google Drive connection and online status states
+  const [driveAuthorized, setDriveAuthorized] = useState(false);
+  const [driveEmail, setDriveEmail] = useState('');
+  const [loadingDrive, setLoadingDrive] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [apiError, setApiError] = useState(false);
+
+  const checkDriveStatus = useCallback(async () => {
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      setLoadingDrive(false);
+      return;
+    }
+
+    setLoadingDrive(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/auth/status`);
+      const data = await response.json();
+      setApiError(false);
+      
+      if (data.authorized) {
+        setDriveAuthorized(true);
+        setDriveEmail(data.email || '');
+        
+        // Backup the active connection tokens inside browser's localStorage for decentralized self-healing
+        try {
+          const exportResponse = await fetch(`${apiUrl}/api/auth/export`);
+          if (exportResponse.ok) {
+            const exportData = await exportResponse.json();
+            if (exportData.tokens) {
+              localStorage.setItem('msa_google_tokens', JSON.stringify(exportData.tokens));
+            }
+          }
+        } catch (exportErr) {
+          console.error('Failed to backup Google Drive connection locally:', exportErr);
+        }
+      } else {
+        // If server database wiped out but browser holds backup tokens, self-heal the login instantly!
+        const savedTokens = localStorage.getItem('msa_google_tokens');
+        if (savedTokens) {
+          try {
+            console.log('Self-healing cloud connection from browser backup...');
+            const importResponse = await fetch(`${apiUrl}/api/auth/import`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tokens: JSON.parse(savedTokens) })
+            });
+            if (importResponse.ok) {
+              const retryResponse = await fetch(`${apiUrl}/api/auth/status`);
+              const retryData = await retryResponse.json();
+              setDriveAuthorized(retryData.authorized);
+              setDriveEmail(retryData.email || '');
+              return;
+            }
+          } catch (importErr) {
+            console.error('Auto-healing connection failed:', importErr);
+          }
+        }
+        
+        setDriveAuthorized(false);
+        setDriveEmail('');
+      }
+    } catch (error) {
+      console.error('Error checking Drive status:', error);
+      setDriveAuthorized(false);
+      setDriveEmail('');
+      setApiError(true);
+    } finally {
+      setLoadingDrive(false);
+    }
+  }, [apiUrl]);
+
+  // Listen for standard browser online/offline connectivity events
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      checkDriveStatus();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [checkDriveStatus]);
+
+  // Active background polling interval (every 4s) to automatically verify and restore connection when offline
+  useEffect(() => {
+    if (isOnline && !apiError) return;
+
+    const interval = setInterval(async () => {
+      if (!navigator.onLine) {
+        setIsOnline(false);
+        return;
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const response = await fetch(`${apiUrl}/api/auth/status`, {
+          method: 'GET',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          setIsOnline(true);
+          setApiError(false);
+          checkDriveStatus();
+        }
+      } catch (err) {
+        console.log('[MSA Hub] Active polling: still offline or disconnected.');
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isOnline, apiError, apiUrl, checkDriveStatus]);
+
+  // Trigger status check on initial load
+  useEffect(() => {
+    checkDriveStatus();
+  }, [checkDriveStatus]);
+
   const handleDigitClick = (digit) => {
     if (passcode.length >= 4 || isShaking) return;
     
@@ -30,23 +170,8 @@ export default function App() {
           setIsLocked(false);
           setPasscode('');
 
-          // Auto-sync/self-heal Google Drive immediately in the background
-          const savedTokens = localStorage.getItem('msa_google_tokens');
-          if (savedTokens) {
-            fetch(`${apiUrl}/api/auth/import`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tokens: JSON.parse(savedTokens) })
-            })
-            .then(res => {
-              if (res.ok) {
-                showToast('Google Drive synced successfully!');
-              }
-            })
-            .catch(err => {
-              console.error('Failed to auto-sync Google Drive on unlock:', err);
-            });
-          }
+          // Refresh status and trigger self-healing sync immediately on unlock
+          checkDriveStatus();
         }, 150);
       } else {
         // Wrong passcode: trigger shake feedback
@@ -81,19 +206,6 @@ export default function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
-
-  // Settings base API Url state
-  const [apiUrl, setApiUrl] = useState(() => {
-    const saved = localStorage.getItem('msa_api_url');
-    if (saved) return saved;
-    
-    // If running locally in development, default to local server port 5000
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
-    }
-    // Permanent production fallback to Render backend
-    return 'https://msa-ozae.onrender.com';
-  });
 
 
   // Visual Toast notifications
@@ -193,6 +305,12 @@ export default function App() {
           apiUrl={apiUrl}
           onCategoryClick={handleCategorySelect}
           onSettingsClick={() => setShowSettings(true)}
+          driveAuthorized={driveAuthorized}
+          driveEmail={driveEmail}
+          loadingDrive={loadingDrive}
+          isOnline={isOnline}
+          apiError={apiError}
+          checkDriveStatus={checkDriveStatus}
         />
       )}
 
@@ -221,7 +339,10 @@ export default function App() {
       {showSettings && (
         <SettingsModal
           apiUrl={apiUrl}
-          onClose={() => setShowSettings(false)}
+          onClose={() => {
+            setShowSettings(false);
+            checkDriveStatus();
+          }}
         />
       )}
 

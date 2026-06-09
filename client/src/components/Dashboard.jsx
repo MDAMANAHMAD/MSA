@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Folder, DollarSign, Clock, Navigation, Cloud, AlertTriangle, ChevronRight, CloudOff, RefreshCw } from 'lucide-react';
 
-export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) {
-  const [driveAuthorized, setDriveAuthorized] = useState(false);
-  const [driveEmail, setDriveEmail] = useState('');
-  const [loadingDrive, setLoadingDrive] = useState(true);
+export default function Dashboard({ 
+  apiUrl, 
+  onCategoryClick, 
+  onSettingsClick,
+  driveAuthorized,
+  driveEmail,
+  loadingDrive,
+  isOnline,
+  apiError,
+  checkDriveStatus
+}) {
   const [greeting, setGreeting] = useState('Welcome Back');
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     // Dynamic secular respected greetings based on hour
@@ -18,143 +23,6 @@ export default function Dashboard({ apiUrl, onCategoryClick, onSettingsClick }) 
     else if (hour < 21) setGreeting('🌆 Good Evening');
     else setGreeting('🌙 Good Night');
   }, []);
-
-  // Listen for standard browser online/offline connectivity events
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      checkDriveStatus(); // Re-verify cloud connection when internet restores!
-    };
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [apiUrl]);
-
-  // Active background polling interval (every 4s) to automatically verify and restore connection when offline
-  useEffect(() => {
-    if (isOnline && !apiError) return;
-
-    const interval = setInterval(async () => {
-      // 1. Check local network adapter status first
-      if (!navigator.onLine) {
-        setIsOnline(false);
-        return;
-      }
-
-      // 2. Perform a real-time server check to ensure full internet + server reachability
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 seconds timeout
-
-        const response = await fetch(`${apiUrl}/api/auth/status`, {
-          method: 'GET',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          console.log('[MSA Hub] Active polling: internet and server connection restored!');
-          setIsOnline(true);
-          setApiError(false);
-          checkDriveStatus(); // Re-verify credentials and refresh home screen
-        }
-      } catch (err) {
-        // Server still unreachable or no actual internet traffic
-        console.log('[MSA Hub] Active polling: still offline or disconnected.');
-      }
-    }, 4000); // Polls every 4 seconds (within the 3-5s range requested)
-
-    return () => clearInterval(interval);
-  }, [isOnline, apiError, apiUrl]);
-
-  const checkDriveStatus = async () => {
-    if (!navigator.onLine) {
-      setIsOnline(false);
-      setLoadingDrive(false);
-      return;
-    }
-
-    setLoadingDrive(true);
-    try {
-      const response = await fetch(`${apiUrl}/api/auth/status`);
-      const data = await response.json();
-      setApiError(false); // Reset error status on successful response
-      
-      if (data.authorized) {
-        setDriveAuthorized(true);
-        setDriveEmail(data.email || '');
-        
-        // Backup the active connection tokens inside browser's localStorage for decentralized self-healing
-        try {
-          const exportResponse = await fetch(`${apiUrl}/api/auth/export`);
-          if (exportResponse.ok) {
-            const exportData = await exportResponse.json();
-            if (exportData.tokens) {
-              localStorage.setItem('msa_google_tokens', JSON.stringify(exportData.tokens));
-            }
-          }
-        } catch (exportErr) {
-          console.error('Failed to backup Google Drive connection locally:', exportErr);
-        }
-      } else {
-        // If server database wiped out but browser holds backup tokens, self-heal the login instantly!
-        const savedTokens = localStorage.getItem('msa_google_tokens');
-        if (savedTokens) {
-          try {
-            console.log('Self-healing cloud connection from browser backup...');
-            const importResponse = await fetch(`${apiUrl}/api/auth/import`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tokens: JSON.parse(savedTokens) })
-            });
-            if (importResponse.ok) {
-              // Successfully self-healed connection, query status again!
-              const retryResponse = await fetch(`${apiUrl}/api/auth/status`);
-              const retryData = await retryResponse.json();
-              setDriveAuthorized(retryData.authorized);
-              setDriveEmail(retryData.email || '');
-              return;
-            }
-          } catch (importErr) {
-            console.error('Auto-healing connection failed:', importErr);
-          }
-        }
-        
-        setDriveAuthorized(false);
-        setDriveEmail('');
-      }
-    } catch (error) {
-      console.error('Error checking Drive status:', error);
-      setDriveAuthorized(false);
-      setDriveEmail('');
-      setApiError(true); // Flag server connection error
-    } finally {
-      setLoadingDrive(false);
-    }
-  };
-
-  useEffect(() => {
-    checkDriveStatus();
-  }, [apiUrl]);
-
-  const handleLinkDrive = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/api/auth/url`);
-      const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url; // Redirect to Google OAuth consent
-      }
-    } catch (error) {
-      console.error('Error fetching Auth URL:', error);
-      alert('Could not start Google Drive authentication. Check connection.');
-    }
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
